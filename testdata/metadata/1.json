@@ -1,0 +1,91 @@
+{
+  "keyslots": {
+    "0": {
+      "type": "luks2",
+      "key_size": 32,
+      "af": {
+        "type": "luks1",
+        "stripes": 4000,
+        "hash": "sha256"
+      },
+      "area": {
+        "type": "raw",
+        "encryption": "aes-xts-plain64",
+        "key_size": 32,
+        "offset": "32768",
+        "size": "131072"
+      },
+      "kdf": {
+        "type": "argon2i",
+        "time": 4,
+        "memory": 235980,
+        "cpus": 2,
+        "salt": "z6vz4xK7cjan92rDA5JF8O6Jk2HouV0O8DMB6GlztVk="
+      }
+    },
+    "1": {
+      "type": "luks2",
+      "key_size": 32,
+      "af": {
+        "type": "luks1",
+        "stripes": 4000,
+        "hash": "sha256"
+      },
+      "area": {
+        "type": "raw",
+        "encryption": "aes-xts-plain64",
+        "key_size": 32,
+        "offset": "163840",
+        "size": "131072"
+      },
+      "kdf": {
+        "type": "pbkdf2",
+        "hash": "sha256",
+        "iterations": 1774240,
+        "salt": "vWcwY3rx2fKpXW2Q6oSCNf8j5bvdJyEzB6BNXECGDsI="
+      }
+    }
+  },
+  "tokens": {
+    "0": {
+      "type": "luks2-keyring",
+      "keyslots": [
+        "1"
+      ],
+      "key_description": "MyKeyringKeyID"
+    }
+  },
+  "segments": {
+    "0": {
+      "type": "crypt",
+      "offset": "4194304",
+      "iv_tweak": "0",
+      "size": "dynamic",
+      "encryption": "aes-xts-plain64",
+      "sector_size": 512
+    }
+  },
+  "digests": {
+    "0": {
+      "type": "pbkdf2",
+      "keyslots": [
+        "0",
+        "1"
+      ],
+      "segments": [
+        "0"
+      ],
+      "hash": "sha256",
+      "iterations": 110890,
+      "salt": "G8gqtKhS96IbogHyJLO+t9kmjLkx+DM3HHJqQtgc2Dk=",
+      "digest": "C9JWko5m+oYmjg6R0t/98cGGzLr/4UaG3hImSJMivfc="
+    }
+  },
+  "config": {
+    "json_size": "12288",
+    "keyslots_size": "4161536",
+    "flags": [
+      "allow-discards"
+    ]
+  }
+}
