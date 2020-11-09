@@ -31,10 +31,14 @@ func TestBootInQemu(t *testing.T) {
 	// These integration tests use QEMU with a statically-compiled kernel (to avoid inintramfs) and a specially
 	// prepared rootfs. See [instructions](https://github.com/anatol/vmtest/blob/master/docs/prepare_image.md)
 	// how to prepare these binaries.
+	params := []string{"-net", "user,hostfwd=tcp::10022-:22", "-net", "nic", "-m", "8G", "-smp", strconv.Itoa(runtime.NumCPU())}
+	if os.Getenv("TEST_DISABLE_KVM") != "1" {
+		params = append(params, "-enable-kvm", "-cpu", "host")
+	}
 	opts := vmtest.QemuOptions{
 		OperatingSystem: vmtest.OS_LINUX,
 		Kernel:          "bzImage",
-		Params:          []string{"-net", "user,hostfwd=tcp::10022-:22", "-net", "nic", "-enable-kvm", "-cpu", "host", "-m", "8G", "-smp", strconv.Itoa(runtime.NumCPU())},
+		Params:          params,
 		Disks:           []string{"rootfs.qcow2"},
 		Append:          []string{"root=/dev/sda", "rw"},
 		Verbose:         testing.Verbose(),
