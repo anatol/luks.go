@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"hash"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -39,12 +38,18 @@ type headerV2 struct {
 	// padding of size 7*512
 }
 
-type luks2Device struct {
+type deviceV2 struct {
+	path string
+	f    *os.File
 	hdr  *headerV2
 	meta *metadata
 }
 
-func luks2OpenDevice(f *os.File) (*luks2Device, error) {
+func (d *deviceV2) Version() int {
+	return 2
+}
+
+func initV2Device(path string, f *os.File) (*deviceV2, error) {
 	var hdr headerV2
 
 	if _, err := f.Seek(0, 0); err != nil {
@@ -96,18 +101,115 @@ func luks2OpenDevice(f *os.File) (*luks2Device, error) {
 		return nil, err
 	}
 
-	dev := &luks2Device{
+	return &deviceV2{
+		path: path,
+		f:    f,
 		hdr:  &hdr,
 		meta: &meta,
-	}
-	return dev, nil
+	}, nil
 }
 
-func (d *luks2Device) uuid() string {
+func (d *deviceV2) Close() error {
+	return d.f.Close()
+}
+
+func (d *deviceV2) Path() string {
+	return d.path
+}
+
+func (d *deviceV2) Slots() []int {
+	var normPrio, highPrio []int
+	for i, k := range d.meta.Keyslots {
+		if k.Priority == "2" {
+			highPrio = append(highPrio, i)
+		} else {
+			normPrio = append(normPrio, i)
+		}
+	}
+	// first we append hogh priority slots, then normal priority
+	return append(highPrio, normPrio...)
+}
+
+func (d *deviceV2) Tokens() ([]Token, error) {
+	var tokens []Token
+
+	type tokenNode struct {
+		Type     string
+		Keyslots []json.Number
+	}
+
+	for _, t := range d.meta.Tokens {
+		var node tokenNode
+		if err := json.Unmarshal(t, &node); err != nil {
+			return nil, err
+		}
+
+		keyslots := make([]int, len(node.Keyslots))
+		for i, s := range node.Keyslots {
+			slotId, err := s.Int64()
+			if err != nil {
+				return nil, err
+			}
+			keyslots[i] = int(slotId)
+		}
+
+		token := Token{
+			Slots:   keyslots,
+			Type:    tokenType(node.Type),
+			Payload: t,
+		}
+
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+func tokenType(t string) TokenType {
+	switch t {
+	case "clevis":
+		return ClevisTokenType
+	default:
+		return UnknownTokenType
+	}
+}
+
+func (d *deviceV2) Uuid() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
-func (d *luks2Device) unlockKeyslot(f *os.File, keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
+func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
+	volume, err := d.decryptKeyslot(keyslot, passphrase)
+	if err != nil {
+		return err
+	}
+	defer clearSlice(volume.key)
+
+	if volume.storageSize == 0 {
+		volume.storageSize, err = computePartitionSize(d.f, volume)
+		if err != nil {
+			return err
+		}
+	}
+
+	return createDmDevice(d.path, dmName, d.Uuid(), volume)
+}
+
+func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
+	for _, k := range d.Slots() {
+		err := d.Unlock(k, passphrase, dmName)
+		if err == nil {
+			return nil
+		} else if err == ErrPassphraseDoesNotMatch {
+			continue
+		} else {
+			return err
+		}
+	}
+	return ErrPassphraseDoesNotMatch
+}
+
+func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
 	keyslots := d.meta.Keyslots
 	if keyslotIdx < 0 || keyslotIdx >= len(keyslots) {
 		return nil, fmt.Errorf("keyslot %d is out of range of available slots", keyslotIdx)
@@ -121,7 +223,7 @@ func (d *luks2Device) unlockKeyslot(f *os.File, keyslotIdx int, passphrase []byt
 	}
 	defer clearSlice(afKey)
 
-	finalKey, err := decryptLuks2VolumeKey(f, keyslotIdx, keyslot, afKey)
+	finalKey, err := d.decryptLuks2VolumeKey(keyslotIdx, keyslot, afKey)
 	if err != nil {
 		return nil, err
 	}
@@ -192,33 +294,6 @@ func (d *luks2Device) unlockKeyslot(f *os.File, keyslotIdx int, passphrase []byt
 	return info, nil
 }
 
-func (d *luks2Device) unlockAnyKeyslot(f *os.File, passphrase []byte) (*volumeInfo, error) {
-	// first we iterate over "high"-priority slots, then "normal"
-	var highPrio, normPrio []int
-	for k, v := range d.meta.Keyslots {
-		if v.Priority == "2" {
-			highPrio = append(highPrio, k)
-		} else if v.Priority == "" || v.Priority == "1" {
-			normPrio = append(normPrio, k)
-		}
-	}
-	sort.Ints(highPrio)
-	sort.Ints(normPrio)
-	activeKeyslots := append(highPrio, normPrio...)
-
-	for _, k := range activeKeyslots {
-		volumeKey, err := d.unlockKeyslot(f, k, passphrase)
-		if err == nil {
-			return volumeKey, nil
-		} else if err == ErrPassphraseDoesNotMatch {
-			continue
-		} else {
-			return nil, err
-		}
-	}
-	return nil, ErrPassphraseDoesNotMatch
-}
-
 func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, error) {
 	digSalt, err := base64.StdEncoding.DecodeString(dig.Salt)
 	if err != nil {
@@ -242,7 +317,7 @@ func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, 
 	}
 }
 
-func decryptLuks2VolumeKey(f *os.File, keyslotIdx int, keyslot keyslot, afKey []byte) ([]byte, error) {
+func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey []byte) ([]byte, error) {
 	// parse encryption mode for the keyslot area, see crypt_parse_name_and_mode()
 	area := keyslot.Area
 
@@ -271,7 +346,7 @@ func decryptLuks2VolumeKey(f *os.File, keyslotIdx int, keyslot keyslot, afKey []
 		return nil, fmt.Errorf("keyslot[%v] offset %v is not aligned to sector size %v", keyslotIdx, keyslotOffset, storageSectorSize)
 	}
 
-	if _, err := f.ReadAt(keyData, keyslotOffset); err != nil {
+	if _, err := d.f.ReadAt(keyData, keyslotOffset); err != nil {
 		return nil, err
 	}
 
@@ -352,7 +427,7 @@ func deriveLuks2AfKey(kdf kdf, keyslotIdx int, passphrase []byte, keyLength uint
 	}
 }
 
-func (d *luks2Device) findDigestForKeyslot(keyslotIdx int) (int, *digest) {
+func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) (int, *digest) {
 	for i, dig := range d.meta.Digests {
 		for _, k := range dig.Keyslots {
 			k, e := k.Int64()

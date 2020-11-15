@@ -1,6 +1,10 @@
 package luks
 
-import "testing"
+import (
+	"os/exec"
+	"strings"
+	"testing"
+)
 
 func TestIsPowerOf2(t *testing.T) {
 	valid := []uint{1, 2, 4, 1 << 3, 1 << 8, 1 << 24}
@@ -43,4 +47,12 @@ func TestFromNulEndedSlice(t *testing.T) {
 	check([]byte{'h', 'e', 'l', 'l', 'o', ',', ' '}, "hello, ")
 	check([]byte{'h', '\x00', 'l', 'l', 'o', ',', ' '}, "h")
 	check([]byte{'\x00'}, "")
+}
+
+func blkdidUuid(filename string) (string, error) {
+	cmdOut, err := exec.Command("blkid", "-s", "UUID", "-o", "value", filename).CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(string(cmdOut), "\n"), nil
 }

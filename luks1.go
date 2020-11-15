@@ -10,7 +10,9 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/xts"
 	"hash"
+	"hash/crc32"
 	"os"
+	"unsafe"
 )
 
 // LUKS v1 format is specified here
@@ -38,11 +40,19 @@ type keySlot struct {
 	Stripes           uint32
 }
 
-type luks1Device struct {
-	hdr *headerV1
+const luksV1SlotEnabled = 0xAC71F3
+
+type deviceV1 struct {
+	path string
+	f    *os.File
+	hdr  *headerV1
 }
 
-func luks1OpenDevice(f *os.File) (*luks1Device, error) {
+func (d *deviceV1) Version() int {
+	return 1
+}
+
+func initV1Device(path string, f *os.File) (*deviceV1, error) {
 	var hdr headerV1
 
 	if _, err := f.Seek(0, 0); err != nil {
@@ -52,49 +62,104 @@ func luks1OpenDevice(f *os.File) (*luks1Device, error) {
 		return nil, err
 	}
 
-	return &luks1Device{hdr: &hdr}, nil
+	return &deviceV1{path: path, f: f, hdr: &hdr}, nil
 }
 
-func (d *luks1Device) uuid() string {
+func (d *deviceV1) Close() error {
+	return d.f.Close()
+}
+
+func (d *deviceV1) Path() string {
+	return d.path
+}
+
+func (d *deviceV1) Slots() []int {
+	slots := make([]int, 0)
+
+	for id, ks := range d.hdr.KeySlots {
+		if ks.Active != luksV1SlotEnabled {
+			continue
+		}
+
+		slots = append(slots, id)
+	}
+
+	return slots
+}
+
+func (d *deviceV1) Uuid() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
-func (d *luks1Device) unlockKeyslot(f *os.File, keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
-	header := d.hdr
+func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
+	volume, err := d.decryptKeyslot(keyslot, passphrase)
+	if err != nil {
+		return err
+	}
+	defer clearSlice(volume.key)
 
-	keyslots := header.KeySlots
+	if volume.storageSize == 0 {
+		volume.storageSize, err = computePartitionSize(d.f, volume)
+		if err != nil {
+			return err
+		}
+	}
+
+	return createDmDevice(d.path, dmName, d.Uuid(), volume)
+}
+
+func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
+	for k, s := range d.hdr.KeySlots {
+		if s.Active != luksV1SlotEnabled {
+			continue
+		}
+
+		err := d.Unlock(k, passphrase, dmName)
+		if err == nil {
+			return nil
+		} else if err == ErrPassphraseDoesNotMatch {
+			continue
+		} else {
+			return err
+		}
+	}
+	return ErrPassphraseDoesNotMatch
+}
+
+func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
+	keyslots := d.hdr.KeySlots
 	if keyslotIdx < 0 || keyslotIdx >= len(keyslots) {
 		return nil, fmt.Errorf("keyslot %d is out of range of available slots", keyslotIdx)
 	}
 	slot := keyslots[keyslotIdx]
 
-	h, err := luks1Hash(fixedArrayToString(header.HashSpec[:]))
+	h, err := luks1Hash(fixedArrayToString(d.hdr.HashSpec[:]))
 	if err != nil {
 		return nil, err
 	}
 
-	afKey := deriveLuks1AfKey(passphrase, slot, int(header.KeyBytes), h)
+	afKey := deriveLuks1AfKey(passphrase, slot, int(d.hdr.KeyBytes), h)
 	defer clearSlice(afKey)
 
-	finalKey, err := decryptLuks1VolumeKey(f, keyslotIdx, header, slot, afKey, h)
+	finalKey, err := d.decryptLuks1VolumeKey(keyslotIdx, slot, afKey, h)
 	if err != nil {
 		return nil, err
 	}
 
 	// verify with digest
-	generatedDigest := pbkdf2.Key(finalKey, header.MkDigestSalt[:], int(header.MkDigestIter), int(header.KeyBytes), h)
+	generatedDigest := pbkdf2.Key(finalKey, d.hdr.MkDigestSalt[:], int(d.hdr.MkDigestIter), int(d.hdr.KeyBytes), h)
 	defer clearSlice(generatedDigest)
-	if !bytes.Equal(generatedDigest[:20], header.MkDigest[:]) {
+	if !bytes.Equal(generatedDigest[:20], d.hdr.MkDigest[:]) {
 		return nil, ErrPassphraseDoesNotMatch
 	}
 
-	encryption := fixedArrayToString(header.CipherName[:]) + "-" + fixedArrayToString(header.CipherMode[:])
+	encryption := fixedArrayToString(d.hdr.CipherName[:]) + "-" + fixedArrayToString(d.hdr.CipherMode[:])
 	info := &volumeInfo{
 		key:               finalKey,
 		digestId:          0,
 		luksType:          "LUKS1",
 		storageSize:       0, // dynamic size
-		storageOffset:     uint64(header.PayloadOffset),
+		storageOffset:     uint64(d.hdr.PayloadOffset),
 		storageEncryption: encryption,
 		storageIvTweak:    0,
 		storageSectorSize: storageSectorSize,
@@ -103,39 +168,20 @@ func (d *luks1Device) unlockKeyslot(f *os.File, keyslotIdx int, passphrase []byt
 	return info, nil
 }
 
-func (d *luks1Device) unlockAnyKeyslot(f *os.File, passphrase []byte) (*volumeInfo, error) {
-	for k, s := range d.hdr.KeySlots {
-		const luksKeyEnabled = 0xAC71F3
-		if s.Active != luksKeyEnabled {
-			continue
-		}
-
-		volumeKey, err := d.unlockKeyslot(f, k, passphrase)
-		if err == nil {
-			return volumeKey, nil
-		} else if err == ErrPassphraseDoesNotMatch {
-			continue
-		} else {
-			return nil, err
-		}
-	}
-	return nil, ErrPassphraseDoesNotMatch
-}
-
-func decryptLuks1VolumeKey(f *os.File, keyslotIdx int, hdr *headerV1, slot keySlot, afKey []byte, h func() hash.Hash) ([]byte, error) {
+func (d *deviceV1) decryptLuks1VolumeKey(keyslotIdx int, slot keySlot, afKey []byte, h func() hash.Hash) ([]byte, error) {
 	// decrypt keyslotIdx area using the derived key
-	keyslotSize := hdr.KeyBytes * stripesNum
+	keyslotSize := d.hdr.KeyBytes * stripesNum
 	if keyslotSize%storageSectorSize != 0 {
 		return nil, fmt.Errorf("keyslot[%v] size %v is not multiple of the sector size %v", keyslotIdx, keyslotSize, storageSectorSize)
 	}
 	keyData := make([]byte, keyslotSize)
 	defer clearSlice(keyData)
 
-	if _, err := f.ReadAt(keyData, int64(slot.KeyMaterialOffset)*storageSectorSize); err != nil {
+	if _, err := d.f.ReadAt(keyData, int64(slot.KeyMaterialOffset)*storageSectorSize); err != nil {
 		return nil, err
 	}
 
-	ciph, err := buildLuks1AfCipher(hdr, afKey)
+	ciph, err := d.buildLuks1AfCipher(afKey)
 	if err != nil {
 		return nil, err
 	}
@@ -149,13 +195,13 @@ func decryptLuks1VolumeKey(f *os.File, keyslotIdx int, hdr *headerV1, slot keySl
 	if slot.Stripes != stripesNum {
 		return nil, fmt.Errorf("LUKS currently supports only af with 4000 stripes")
 	}
-	return afMerge(keyData, int(hdr.KeyBytes), int(slot.Stripes), h())
+	return afMerge(keyData, int(d.hdr.KeyBytes), int(slot.Stripes), h())
 }
 
-func buildLuks1AfCipher(hdr *headerV1, afKey []byte) (*xts.Cipher, error) {
+func (d *deviceV1) buildLuks1AfCipher(afKey []byte) (*xts.Cipher, error) {
 	var cipherFunc func(key []byte) (cipher.Block, error)
 
-	cipherName := fixedArrayToString(hdr.CipherName[:])
+	cipherName := fixedArrayToString(d.hdr.CipherName[:])
 	switch cipherName {
 	case "aes":
 		cipherFunc = aes.NewCipher
@@ -163,12 +209,106 @@ func buildLuks1AfCipher(hdr *headerV1, afKey []byte) (*xts.Cipher, error) {
 		return nil, fmt.Errorf("Unknown cipher: %v", cipherName)
 	}
 
-	cipherMode := fixedArrayToString(hdr.CipherMode[:])
+	cipherMode := fixedArrayToString(d.hdr.CipherMode[:])
 	switch cipherMode {
 	case "xts-plain64":
 		return xts.NewCipher(cipherFunc, afKey)
 	default:
 		return nil, fmt.Errorf("Unknown encryption mode: %v", cipherMode)
+	}
+}
+
+var (
+	luksMetaMagic    = []byte("LUKSMETA")
+	luksMetaNullUuid = make([]byte, 16)
+)
+
+type luksMetaSlot struct {
+	Uuid   [16]byte
+	Offset uint32
+	Length uint32
+	Crc32  uint32
+	_      uint32
+}
+
+type luksMetaHeader struct {
+	Magic   [8]byte
+	Version uint32
+	Crc32   uint32
+	Slots   [8]luksMetaSlot
+}
+
+// readLuksMeta read non-standard metadata information for LUKS v1
+// It follows implementation defined at https://github.com/latchset/luksmeta
+func (d *deviceV1) Tokens() ([]Token, error) {
+	var hdr luksMetaHeader
+	data := make([]byte, unsafe.Sizeof(hdr))
+
+	var holeOffset int
+	length := int(d.hdr.KeyBytes * stripesNum)
+	for _, s := range d.hdr.KeySlots {
+		offset := int(s.KeyMaterialOffset * storageSectorSize)
+		if holeOffset < offset+length {
+			holeOffset = offset + length
+		}
+	}
+	holeOffset = roundUp(holeOffset, 4096)
+
+	if _, err := d.f.ReadAt(data, int64(holeOffset)); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &hdr); err != nil {
+		return nil, err
+	}
+
+	tokens := make([]Token, 0)
+	if !bytes.Equal(hdr.Magic[:], luksMetaMagic) {
+		return tokens, nil
+	}
+
+	crcFieldOffset := unsafe.Offsetof(hdr.Crc32)
+	clearSlice(data[crcFieldOffset : crcFieldOffset+4])
+	hdrChecksum := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+	if _, err := hdrChecksum.Write(data); err != nil {
+		return nil, err
+	}
+	if hdrChecksum.Sum32() != hdr.Crc32 {
+		return nil, fmt.Errorf("Luks Meta header CRC error")
+	}
+
+	for i, s := range hdr.Slots {
+		if !bytes.Equal(s.Uuid[:], luksMetaNullUuid) {
+			payload := make([]byte, s.Length)
+			if _, err := d.f.ReadAt(payload, int64(holeOffset)+int64(s.Offset)); err != nil {
+				return nil, err
+			}
+			tokenChecksum := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+			if _, err := tokenChecksum.Write(payload); err != nil {
+				return nil, err
+			}
+			if tokenChecksum.Sum32() != s.Crc32 {
+				return nil, fmt.Errorf("Luks Meta token #%d CRC error", i)
+			}
+
+			t := Token{
+				Slots:   []int{i},
+				Type:    luksMetaTokenType(s.Uuid[:]),
+				Payload: payload,
+			}
+			tokens = append(tokens, t)
+		}
+	}
+
+	return tokens, nil
+}
+
+var clevisUuid = []byte{0xcb, 0x6e, 0x89, 0x04, 0x81, 0xff, 0x40, 0xda, 0xa8, 0x4a, 0x07, 0xab, 0x9a, 0xb5, 0x71, 0x5e}
+
+func luksMetaTokenType(uuid []byte) TokenType {
+	if bytes.Equal(uuid, clevisUuid) {
+		return ClevisTokenType
+	} else {
+		return UnknownTokenType
 	}
 }
 

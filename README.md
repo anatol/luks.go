@@ -7,8 +7,14 @@ any modifications to LUKS metadata header.
 
 Here is an example that demonstrates the API usage:
 ```go
+dev, err := luks.Open("/dev/sda1");
+if err != nil {
+  // handle error
+}
+defer dev.Close()
+
 // equivalent of `cryptsetup open /dev/sda1 volumename`
-err := luks.Open("/dev/sda1", "volumename", /* slot */ 0, []byte("password"));
+err = dev.Unlock(/* slot */ 0, []byte("password"), "volumename")
 if err == luks.ErrPassphraseDoesNotMatch {
     log.Printf("The password is incorrect")
 } else if err != nil {
@@ -18,7 +24,7 @@ if err == luks.ErrPassphraseDoesNotMatch {
 }
 
 // equivalent of `cryptsetup close volumename`
-if err := luks.Close("volumename"); err != nil {
+if err := luks.Lock("volumename"); err != nil {
     log.Print(err)
 }
 ```

@@ -6,9 +6,13 @@ import (
 	"github.com/anatol/luks.go"
 )
 
+// before running this example please setup a loop device with 'sudo losetup -fP ./disk.sample'
 func main() {
-	// first setup a loop device with 'sudo losetup -fP ./disk.sample'
-	err := luks.Open("/dev/loop0", "foo", 0, []byte("foobar"))
+	dev, err := luks.Open("/dev/loop0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = dev.Unlock(0, []byte("foobar"), "foo")
 	if err != nil {
 		log.Fatal(err)
 	}

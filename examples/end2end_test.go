@@ -107,11 +107,16 @@ func luksTestCase(t *testing.T, name string, formatArgs ...string) {
 			t.Fatalf("It is expected file /dev/mapper/%v does not exist", name)
 		}
 
-		// open the crypt device again, this time with our Golang API
-		if err := luks.Open(loopDev.Path(), name, 0, []byte(password)); err != nil {
+		dev, err := luks.Open(loopDev.Path())
+		if err != nil {
 			t.Fatal(err)
 		}
-		defer luks.Close(name)
+		defer dev.Close()
+		// open the crypt device again, this time with our Golang API
+		if err := dev.Unlock(0, []byte(password), name); err != nil {
+			t.Fatal(err)
+		}
+		defer luks.Lock(name)
 
 		// dm-crypt mount is an asynchronous process, we need to wait a bit until /dev/mapper/ file appears
 		time.Sleep(200 * time.Millisecond)

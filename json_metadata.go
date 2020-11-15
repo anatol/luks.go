@@ -39,8 +39,6 @@ type kdf struct {
 	Cpus   uint `json:"cpus"`
 }
 
-type token map[string]interface{}
-
 type segment struct {
 	Type       string      `json:"type"`
 	Offset     json.Number `json:"offset"`
@@ -68,9 +66,9 @@ type config struct {
 }
 
 type metadata struct {
-	Keyslots map[int]keyslot `json:"keyslots"`
-	Tokens   map[int]token   `json:"tokens"`
-	Segments map[int]segment `json:"segments"`
-	Digests  map[int]digest  `json:"digests"`
-	Config   config          `json:"config"`
+	Keyslots map[int]keyslot         `json:"keyslots"`
+	Tokens   map[int]json.RawMessage `json:"tokens"`
+	Segments map[int]segment         `json:"segments"`
+	Digests  map[int]digest          `json:"digests"`
+	Config   config                  `json:"config"`
 }

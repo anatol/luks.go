@@ -39,7 +39,7 @@ func TestBootInQemu(t *testing.T) {
 		OperatingSystem: vmtest.OS_LINUX,
 		Kernel:          "bzImage",
 		Params:          params,
-		Disks:           []string{"rootfs.qcow2"},
+		Disks:           []string{"rootfs.cow"},
 		Append:          []string{"root=/dev/sda", "rw"},
 		Verbose:         testing.Verbose(),
 		Timeout:         50 * time.Second,

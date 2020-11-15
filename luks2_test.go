@@ -1,9 +1,11 @@
 package luks
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -42,12 +44,20 @@ func TestLuks2Unlock(t *testing.T) {
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
-	luks, err := luks2OpenDevice(disk)
+	d, err := initV2Device(disk.Name(), disk)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := luks.unlockKeyslot(disk, 0, []byte(password)); err != nil {
+	uuid, err := blkdidUuid(disk.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Uuid() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	}
+
+	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -75,15 +85,82 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	luks, err := luks2OpenDevice(disk)
+	d, err := initV2Device(disk.Name(), disk)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := luks.unlockAnyKeyslot(disk, []byte(password)); err != nil {
+	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := luks.unlockAnyKeyslot(disk, []byte(password2)); err != nil {
+	if _, err := d.decryptKeyslot(1, []byte(password2)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLuks2UnlockWithToken(t *testing.T) {
+	t.Parallel()
+
+	password := "foobar"
+	disk, err := prepareLuks2Disk(t, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer disk.Close()
+	defer os.Remove(disk.Name())
+
+	addTokenCmd := exec.Command("cryptsetup", "token", "import", disk.Name())
+	slotId := 0
+	payload := fmt.Sprintf(`{"type":"clevis","keyslots":["%d"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`, slotId)
+	addTokenCmd.Stdin = strings.NewReader(payload)
+	if testing.Verbose() {
+		addTokenCmd.Stdout = os.Stdout
+		addTokenCmd.Stderr = os.Stderr
+	}
+	if err := addTokenCmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := initV2Device(disk.Name(), disk)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slots := d.Slots()
+	if len(slots) != 1 && slots[0] != 0 {
+		t.Fatalf("Invalid slots data")
+	}
+
+	tokens, err := d.Tokens()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("Expected 1 token, got %d", len(tokens))
+	}
+	tk := tokens[0]
+	if tk.Type != ClevisTokenType {
+		t.Fatalf("Expected clevis token type, got %d", tk.Type)
+	}
+	if !reflect.DeepEqual(tk.Slots, []int{0}) {
+		t.Fatalf("Expected '0' slotid, got %+v", tk.Slots)
+	}
+
+	expected := `{"type":"clevis","keyslots":["0"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`
+	p := string(tk.Payload)
+	if p != expected {
+		t.Fatalf("Invalid token payload received, expected '%s', got '%s'", expected, p)
+	}
+
+	uuid, err := blkdidUuid(disk.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Uuid() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	}
+
+	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
 		t.Fatal(err)
 	}
 }
