@@ -39,7 +39,7 @@ func TestBootInQemu(t *testing.T) {
 		OperatingSystem: vmtest.OS_LINUX,
 		Kernel:          "bzImage",
 		Params:          params,
-		Disks:           []string{"rootfs.cow"},
+		Disks:           []vmtest.QemuDisk{{"rootfs.cow", "qcow2"}},
 		Append:          []string{"root=/dev/sda", "rw"},
 		Verbose:         testing.Verbose(),
 		Timeout:         50 * time.Second,
@@ -49,8 +49,8 @@ func TestBootInQemu(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Stop QEMU at the end of the test case
-	defer qemu.Stop()
+	// Shutdown QEMU at the end of the test case
+	defer qemu.Shutdown()
 
 	config := &ssh.ClientConfig{
 		User:            "root",
