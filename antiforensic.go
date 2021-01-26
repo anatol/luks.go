@@ -14,6 +14,16 @@ func xorSlices(src1, src2 []byte, dest []byte) {
 	}
 }
 
+func hashBuffer(src []byte, h hash.Hash, iv int, result []byte) []byte {
+	ivSlice := make([]byte, 4)
+	binary.BigEndian.PutUint32(ivSlice, uint32(iv))
+
+	h.Reset()
+	h.Write(ivSlice)
+	h.Write(src)
+	return h.Sum(result)
+}
+
 func diffuse(src []byte, h hash.Hash) []byte {
 	// src and dest are of the same size
 	sliceSize := len(src)
@@ -21,13 +31,12 @@ func diffuse(src []byte, h hash.Hash) []byte {
 	digestSize := h.Size()
 
 	for i := 0; i < sliceSize/digestSize; i++ {
-		ivSlice := make([]byte, 4)
-		binary.BigEndian.PutUint32(ivSlice, uint32(i))
+		result = hashBuffer(src[i*digestSize:(i+1)*digestSize], h, i, result)
+	}
 
-		h.Reset()
-		h.Write(ivSlice)
-		h.Write(src[i*digestSize : (i+1)*digestSize])
-		result = h.Sum(result)
+	if padding := sliceSize % digestSize; padding != 0 {
+		result = hashBuffer(src[sliceSize-padding:], h, sliceSize/digestSize, result)
+		result = result[:sliceSize]
 	}
 
 	return result
@@ -66,10 +75,6 @@ func afMerge(src []byte, blockSize, blockNum int, h hash.Hash) ([]byte, error) {
 
 	if blockSize*blockNum > len(src) {
 		return nil, fmt.Errorf("af merge input buffer size mismatch %v * %v != %v", blockSize, blockNum, len(src))
-	}
-	digestSize := h.Size()
-	if blockSize%digestSize != 0 {
-		return nil, fmt.Errorf("af merge block size mismatch: input buffer size %v, hash size is %v", blockSize, digestSize)
 	}
 
 	for i := 0; i < blockNum-1; i++ {

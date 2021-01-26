@@ -3,11 +3,15 @@ package luks
 import (
 	"bytes"
 	"crypto/sha256"
+	"hash"
 	"testing"
+
+	"golang.org/x/crypto/ripemd160"
 )
 
-func TestAntiforensic(t *testing.T) {
-	hash := sha256.New()
+func runAntiforensicTest(t *testing.T, hash hash.Hash) {
+	t.Parallel()
+
 	stripes := 4000
 	password := []byte("my password")
 	keySize := 64
@@ -33,4 +37,12 @@ func TestAntiforensic(t *testing.T) {
 	if !bytes.Equal(secret, final) {
 		t.Fatal()
 	}
+}
+
+func TestAntiforensicSha256(t *testing.T) {
+	runAntiforensicTest(t, sha256.New())
+}
+
+func TestAntiforensicRipemd160(t *testing.T) {
+	runAntiforensicTest(t, ripemd160.New())
 }

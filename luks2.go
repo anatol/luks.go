@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -17,6 +19,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/xts"
 )
@@ -306,12 +309,33 @@ func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, 
 		var h func() hash.Hash
 		var size int
 		switch dig.Hash {
+		case "sha1":
+			h = sha1.New
+			size = sha1.Size
+		case "sha224":
+			h = sha256.New224
+			size = sha256.Size224
 		case "sha256":
 			h = sha256.New
 			size = sha256.Size
+		case "sha384":
+			h = sha512.New384
+			size = sha512.Size384
+		case "sha3-224":
+			h = sha3.New224
+			size = 224 / 8
+		case "sha3-256":
+			h = sha3.New256
+			size = 256 / 8
+		case "sha3-384":
+			h = sha3.New384
+			size = 384 / 8
 		case "sha3-512":
 			h = sha3.New512
 			size = 512 / 8
+		case "ripemd160":
+			h = ripemd160.New
+			size = ripemd160.Size
 		default:
 			return nil, fmt.Errorf("Unknown digest hash algorithm: %v", dig.Hash)
 		}
@@ -371,10 +395,27 @@ func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey 
 	}
 	var afHash hash.Hash
 	switch af.Hash {
+	// Note that cryptsetup support a few more hash algorithms not implemented here: whirlpool, stribog256, stribog512, sm3
+	// golang lib does not implement those
+	// TODO use third-party implementations for other hashes and add its support to luks.go
+	case "sha1":
+		afHash = sha1.New()
+	case "sha224":
+		afHash = sha256.New224()
 	case "sha256":
 		afHash = sha256.New()
+	case "sha384":
+		afHash = sha512.New384()
+	case "sha3-224":
+		afHash = sha3.New224()
+	case "sha3-256":
+		afHash = sha3.New256()
+	case "sha3-384":
+		afHash = sha3.New384()
 	case "sha3-512":
 		afHash = sha3.New512()
+	case "ripemd160":
+		afHash = ripemd160.New()
 	default:
 		return nil, fmt.Errorf("Unknown af hash algorithm: %v", af.Hash)
 	}

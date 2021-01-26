@@ -4,15 +4,20 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
-	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/crypto/xts"
 	"hash"
 	"hash/crc32"
 	"os"
 	"unsafe"
+
+	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/sha3"
+	"golang.org/x/crypto/xts"
 )
 
 // LUKS v1 format is specified here
@@ -318,8 +323,24 @@ func deriveLuks1AfKey(passphrase []byte, slot keySlot, keySize int, h func() has
 
 func luks1Hash(hashSpecName string) (func() hash.Hash, error) {
 	switch hashSpecName {
+	case "sha1":
+		return sha1.New, nil
+	case "sha224":
+		return sha256.New224, nil
 	case "sha256":
 		return sha256.New, nil
+	case "sha384":
+		return sha512.New384, nil
+	case "sha3-224":
+		return sha3.New224, nil
+	case "sha3-256":
+		return sha3.New256, nil
+	case "sha3-384":
+		return sha3.New384, nil
+	case "sha3-512":
+		return sha3.New512, nil
+	case "ripemd160":
+		return ripemd160.New, nil
 	default:
 		return nil, fmt.Errorf("Unknown hash spec algorithm: %v", hashSpecName)
 	}

@@ -34,7 +34,6 @@ func prepareLuks2Disk(t *testing.T, password string, cryptsetupArgs ...string) (
 	return disk, err
 }
 
-// TODO: test custom --sector-size
 func runLuks2Test(t *testing.T, cryptsetupArgs ...string) {
 	t.Parallel()
 
@@ -68,8 +67,17 @@ func TestLuks2UnlockBasic(t *testing.T) {
 	runLuks2Test(t)
 }
 
+func TestLuks2UnlockCustomSectorSize(t *testing.T) {
+	runLuks2Test(t, "--sector-size", "2048")
+}
+
 func TestLuks2UnlockSha3(t *testing.T) {
 	runLuks2Test(t, "--perf-no_read_workqueue", "--perf-no_write_workqueue", "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
+}
+
+func TestLuks2UnlockRipemd160(t *testing.T) {
+	// ripemd160 forces use of AF padding
+	runLuks2Test(t, "--hash", "ripemd160")
 }
 
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {

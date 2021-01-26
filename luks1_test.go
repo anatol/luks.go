@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func prepareLuks1Disk(t *testing.T, password string) (*os.File, error) {
+func prepareLuks1Disk(t *testing.T, password string, cryptsetupArgs ...string) (*os.File, error) {
 	disk, err := ioutil.TempFile("", "luksv1.go.disk")
 	if err != nil {
 		t.Fatal(err)
@@ -18,7 +18,9 @@ func prepareLuks1Disk(t *testing.T, password string) (*os.File, error) {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("cryptsetup", "luksFormat", "--type", "luks1", "--iter-time", "5", "-q", disk.Name())
+	args := []string{"luksFormat", "--type", "luks1", "--iter-time", "5", "-q", disk.Name()}
+	args = append(args, cryptsetupArgs...)
+	cmd := exec.Command("cryptsetup", args...)
 
 	cmd.Stdin = strings.NewReader(password)
 	if testing.Verbose() {
@@ -31,11 +33,11 @@ func prepareLuks1Disk(t *testing.T, password string) (*os.File, error) {
 	return disk, err
 }
 
-func TestLuks1Unlock(t *testing.T) {
+func runLuks1Test(t *testing.T, cryptsetupArgs ...string) {
 	t.Parallel()
 
 	password := "foobar"
-	disk, err := prepareLuks1Disk(t, password)
+	disk, err := prepareLuks1Disk(t, password, cryptsetupArgs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +68,14 @@ func TestLuks1Unlock(t *testing.T) {
 	if d.Uuid() != uuid {
 		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
 	}
+}
+
+func TestLuks1Unlock(t *testing.T) {
+	runLuks1Test(t)
+}
+
+func TestLuks1Sha256(t *testing.T) {
+	runLuks1Test(t, "--hash", "sha256")
 }
 
 func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
