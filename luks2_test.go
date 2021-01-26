@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func prepareLuks2Disk(t *testing.T, password string) (*os.File, error) {
+func prepareLuks2Disk(t *testing.T, password string, cryptsetupArgs ...string) (*os.File, error) {
 	disk, err := ioutil.TempFile("", "luksv2.go.disk")
 	if err != nil {
 		t.Fatal(err)
@@ -20,7 +20,9 @@ func prepareLuks2Disk(t *testing.T, password string) (*os.File, error) {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("cryptsetup", "luksFormat", "--type", "luks2", "--iter-time", "5", "-q", disk.Name())
+	args := []string{"luksFormat", "--type", "luks2", "--iter-time", "5", "-q", disk.Name()}
+	args = append(args, cryptsetupArgs...)
+	cmd := exec.Command("cryptsetup", args...)
 	cmd.Stdin = strings.NewReader(password)
 	if testing.Verbose() {
 		cmd.Stdout = os.Stdout
@@ -33,11 +35,11 @@ func prepareLuks2Disk(t *testing.T, password string) (*os.File, error) {
 }
 
 // TODO: test custom --sector-size
-func TestLuks2Unlock(t *testing.T) {
+func runLuks2Test(t *testing.T, cryptsetupArgs ...string) {
 	t.Parallel()
 
 	password := "foobar"
-	disk, err := prepareLuks2Disk(t, password)
+	disk, err := prepareLuks2Disk(t, password, cryptsetupArgs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +62,14 @@ func TestLuks2Unlock(t *testing.T) {
 	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestLuks2UnlockBasic(t *testing.T) {
+	runLuks2Test(t)
+}
+
+func TestLuks2UnlockSha3(t *testing.T) {
+	runLuks2Test(t, "--perf-no_read_workqueue", "--perf-no_write_workqueue", "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
 }
 
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {

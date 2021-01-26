@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/xts"
 )
 
@@ -308,6 +309,9 @@ func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, 
 		case "sha256":
 			h = sha256.New
 			size = sha256.Size
+		case "sha3-512":
+			h = sha3.New512
+			size = 512 / 8
 		default:
 			return nil, fmt.Errorf("Unknown digest hash algorithm: %v", dig.Hash)
 		}
@@ -369,6 +373,8 @@ func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey 
 	switch af.Hash {
 	case "sha256":
 		afHash = sha256.New()
+	case "sha3-512":
+		afHash = sha3.New512()
 	default:
 		return nil, fmt.Errorf("Unknown af hash algorithm: %v", af.Hash)
 	}
