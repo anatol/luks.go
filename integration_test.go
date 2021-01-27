@@ -16,6 +16,8 @@ import (
 )
 
 func TestBootInQemu(t *testing.T) {
+	t.Parallel()
+
 	cmd := exec.Command("go", "test", "-c", "examples/end2end_test.go", "-o", "luks_end2end_test")
 	if testing.Verbose() {
 		log.Print("compile in-qemu test binary")

@@ -3,6 +3,7 @@ package luks
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -10,7 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func createDmDevice(path string, dmName string, partitionUuid string, volume *volumeInfo) error {
+func createDmDevice(path string, dmName string, partitionUuid string, volume *volumeInfo, flags []string) error {
 	// load key into keyring
 	keyname := fmt.Sprintf("cryptsetup:%s-d%d", partitionUuid, volume.digestId) // get_key_description_by_digest
 	kid, err := unix.AddKey("logon", keyname, volume.key, unix.KEY_SPEC_THREAD_KEYRING)
@@ -37,13 +38,22 @@ func createDmDevice(path string, dmName string, partitionUuid string, volume *vo
 	}
 
 	keyid := fmt.Sprintf(":%v:logon:%v", len(volume.key), keyname)
-	storageArg := fmt.Sprintf("%v %v %v %v %v %v", volume.storageEncryption, keyid, volume.storageIvTweak, path, volume.storageOffset, "0") // see get_dm_crypt_params() for more info about formatting this parameter
+	// see get_dm_crypt_params() for more info about this parameter formatting
+	storageArg := []string{volume.storageEncryption, keyid, strconv.Itoa(int(volume.storageIvTweak)), path, strconv.Itoa(int(volume.storageOffset))}
+	storageArg = append(storageArg, strconv.Itoa(len(flags)))
+	for _, f := range flags {
+		kernelFlag, ok := flagsKernelNames[f]
+		if !ok {
+			return fmt.Errorf("Unknown LUKS flag: %v", f)
+		}
+		storageArg = append(storageArg, kernelFlag)
+	}
 
 	spec := []targetSpec{{
 		sectorStart: 0, // always zero
 		length:      volume.storageSize,
 		targetType:  "crypt",
-		args:        storageArg,
+		args:        strings.Join(storageArg, " "),
 	}}
 
 	if err := dmIoctl(controlFile, unix.DM_TABLE_LOAD, dmName, "", spec); err != nil {

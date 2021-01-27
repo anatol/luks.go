@@ -13,6 +13,11 @@ if err != nil {
 }
 defer dev.Close()
 
+// set LUKS flags before unlocking the volume
+if err := dev.FlagsAdd(luks.FlagNoReadWorkqueue, luks.FlagNoWriteWorkqueue); err != nil {
+    log.Print(err)
+}
+
 // equivalent of `cryptsetup open /dev/sda1 volumename`
 err = dev.Unlock(/* slot */ 0, []byte("password"), "volumename")
 if err == luks.ErrPassphraseDoesNotMatch {

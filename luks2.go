@@ -43,14 +43,11 @@ type headerV2 struct {
 }
 
 type deviceV2 struct {
-	path string
-	f    *os.File
-	hdr  *headerV2
-	meta *metadata
-}
-
-func (d *deviceV2) Version() int {
-	return 2
+	path  string
+	f     *os.File
+	hdr   *headerV2
+	meta  *metadata
+	flags []string
 }
 
 func initV2Device(path string, f *os.File) (*deviceV2, error) {
@@ -106,10 +103,11 @@ func initV2Device(path string, f *os.File) (*deviceV2, error) {
 	}
 
 	return &deviceV2{
-		path: path,
-		f:    f,
-		hdr:  &hdr,
-		meta: &meta,
+		path:  path,
+		f:     f,
+		hdr:   &hdr,
+		meta:  &meta,
+		flags: meta.Config.Flags,
 	}, nil
 }
 
@@ -130,7 +128,7 @@ func (d *deviceV2) Slots() []int {
 			normPrio = append(normPrio, i)
 		}
 	}
-	// first we append hogh priority slots, then normal priority
+	// first we append high priority slots, then normal priority
 	return append(highPrio, normPrio...)
 }
 
@@ -182,6 +180,28 @@ func (d *deviceV2) Uuid() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
+func (d *deviceV2) FlagsGet() []string {
+	return d.flags
+}
+
+func (d *deviceV2) FlagsAdd(flags ...string) error {
+	for _, f := range flags {
+		if _, ok := flagsKernelNames[f]; !ok {
+			return fmt.Errorf("Unknown LUKS flag: %v", f)
+		}
+	}
+	d.flags = append(d.flags, flags...)
+	return nil
+}
+
+func (d *deviceV2) FlagsClear() {
+	d.flags = nil
+}
+
+func (d *deviceV2) Version() int {
+	return 2
+}
+
 func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
 	volume, err := d.decryptKeyslot(keyslot, passphrase)
 	if err != nil {
@@ -196,7 +216,7 @@ func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
 		}
 	}
 
-	return createDmDevice(d.path, dmName, d.Uuid(), volume)
+	return createDmDevice(d.path, dmName, d.Uuid(), volume, d.flags)
 }
 
 func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {

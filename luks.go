@@ -24,6 +24,14 @@ type Device interface {
 	Slots() []int
 	// Slots returns list of available tokens (metadata) for slots
 	Tokens() ([]Token, error)
+	// FlagsGet get the list of LUKS flags (options) used during unlocking
+	FlagsGet() []string
+	// FlagsAdd adds LUKS flags used for the upcoming unlocking
+	// Note that this method does not update LUKS v2 persistent flags
+	FlagsAdd(flags ...string) error
+	// FlagsClear clears flags
+	// Note that this method does not update LUKS v2 persistent flags
+	FlagsClear()
 	Unlock(keyslot int, passphrase []byte, dmName string) error
 	UnlockAny(passphrase []byte, dmName string) error
 }
@@ -34,6 +42,25 @@ const (
 	UnknownTokenType TokenType = iota
 	ClevisTokenType
 )
+
+// List of options handled by luks.go API.
+// These names correspond to LUKSv2 persistent flags names (see persistent_flags[] array).
+const (
+	FlagAllowDiscards       string = "allow-discards"
+	FlagSameCPUCrypt        string = "same-cpu-crypt"
+	FlagSubmitFromCryptCPUs string = "submit-from-crypt-cpus"
+	FlagNoReadWorkqueue     string = "no-read-workqueue"
+	FlagNoWriteWorkqueue    string = "no-write-workqueue"
+)
+
+// map of LUKS flag names to its dm-crypt counterparts
+var flagsKernelNames = map[string]string{
+	FlagAllowDiscards:       "allow_discards",
+	FlagSameCPUCrypt:        "same_cpu_crypt",
+	FlagSubmitFromCryptCPUs: "submit_from_crypt_cpus",
+	FlagNoReadWorkqueue:     "no_read_workqueue",
+	FlagNoWriteWorkqueue:    "no_write_workqueue",
+}
 
 type Token struct {
 	Slots   []int

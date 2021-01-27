@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-func prepareLuks2Disk(t *testing.T, password string, cryptsetupArgs ...string) (*os.File, error) {
+func prepareLuks2Disk(password string, cryptsetupArgs ...string) (*os.File, error) {
 	disk, err := ioutil.TempFile("", "luksv2.go.disk")
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	if err := disk.Truncate(24 * 1024 * 1024); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	args := []string{"luksFormat", "--type", "luks2", "--iter-time", "5", "-q", disk.Name()}
@@ -29,16 +29,17 @@ func prepareLuks2Disk(t *testing.T, password string, cryptsetupArgs ...string) (
 		cmd.Stderr = os.Stderr
 	}
 	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	return disk, err
+
+	return disk, nil
 }
 
 func runLuks2Test(t *testing.T, cryptsetupArgs ...string) {
 	t.Parallel()
 
 	password := "foobar"
-	disk, err := prepareLuks2Disk(t, password, cryptsetupArgs...)
+	disk, err := prepareLuks2Disk(password, cryptsetupArgs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +73,7 @@ func TestLuks2UnlockCustomSectorSize(t *testing.T) {
 }
 
 func TestLuks2UnlockSha3(t *testing.T) {
-	runLuks2Test(t, "--perf-no_read_workqueue", "--perf-no_write_workqueue", "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
+	runLuks2Test(t, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
 }
 
 func TestLuks2UnlockRipemd160(t *testing.T) {
@@ -84,7 +85,7 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	t.Parallel()
 
 	password := "barfoo"
-	disk, err := prepareLuks2Disk(t, password)
+	disk, err := prepareLuks2Disk(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 	t.Parallel()
 
 	password := "foobar"
-	disk, err := prepareLuks2Disk(t, password)
+	disk, err := prepareLuks2Disk(password)
 	if err != nil {
 		t.Fatal(err)
 	}

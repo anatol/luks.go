@@ -48,13 +48,10 @@ type keySlot struct {
 const luksV1SlotEnabled = 0xAC71F3
 
 type deviceV1 struct {
-	path string
-	f    *os.File
-	hdr  *headerV1
-}
-
-func (d *deviceV1) Version() int {
-	return 1
+	path  string
+	f     *os.File
+	hdr   *headerV1
+	flags []string
 }
 
 func initV1Device(path string, f *os.File) (*deviceV1, error) {
@@ -96,6 +93,28 @@ func (d *deviceV1) Uuid() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
+func (d *deviceV1) FlagsGet() []string {
+	return d.flags
+}
+
+func (d *deviceV1) FlagsAdd(flags ...string) error {
+	for _, f := range flags {
+		if _, ok := flagsKernelNames[f]; !ok {
+			return fmt.Errorf("Unknown LUKS flag: %v", f)
+		}
+	}
+	d.flags = append(d.flags, flags...)
+	return nil
+}
+
+func (d *deviceV1) FlagsClear() {
+	d.flags = nil
+}
+
+func (d *deviceV1) Version() int {
+	return 1
+}
+
 func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
 	volume, err := d.decryptKeyslot(keyslot, passphrase)
 	if err != nil {
@@ -110,7 +129,7 @@ func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
 		}
 	}
 
-	return createDmDevice(d.path, dmName, d.Uuid(), volume)
+	return createDmDevice(d.path, dmName, d.Uuid(), volume, d.flags)
 }
 
 func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
