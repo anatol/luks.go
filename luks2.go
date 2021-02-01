@@ -235,11 +235,11 @@ func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
 
 func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
 	keyslots := d.meta.Keyslots
-	if keyslotIdx < 0 || keyslotIdx >= len(keyslots) {
-		return nil, fmt.Errorf("keyslot %d is out of range of available slots", keyslotIdx)
-	}
 
-	keyslot := keyslots[keyslotIdx]
+	keyslot, ok := keyslots[keyslotIdx]
+	if !ok {
+		return nil, fmt.Errorf("Unable to get a keyslot with id: %d", keyslotIdx)
+	}
 
 	afKey, err := deriveLuks2AfKey(keyslot.Kdf, keyslotIdx, passphrase, keyslot.KeySize)
 	if err != nil {

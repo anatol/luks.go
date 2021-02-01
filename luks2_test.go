@@ -35,7 +35,7 @@ func prepareLuks2Disk(password string, cryptsetupArgs ...string) (*os.File, erro
 	return disk, nil
 }
 
-func runLuks2Test(t *testing.T, cryptsetupArgs ...string) {
+func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 	t.Parallel()
 
 	password := "foobar"
@@ -59,26 +59,30 @@ func runLuks2Test(t *testing.T, cryptsetupArgs ...string) {
 		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
 	}
 
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
+	if _, err := d.decryptKeyslot(keySlot, []byte(password)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestLuks2UnlockBasic(t *testing.T) {
-	runLuks2Test(t)
+	runLuks2Test(t, 0)
 }
 
 func TestLuks2UnlockCustomSectorSize(t *testing.T) {
-	runLuks2Test(t, "--sector-size", "2048")
+	runLuks2Test(t, 0, "--sector-size", "2048")
+}
+
+func TestLuks2UnlockNonZeroSlotId(t *testing.T) {
+	runLuks2Test(t, 4, "--key-slot", "4")
 }
 
 func TestLuks2UnlockSha3(t *testing.T) {
-	runLuks2Test(t, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
+	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
 }
 
 func TestLuks2UnlockRipemd160(t *testing.T) {
 	// ripemd160 forces use of AF padding
-	runLuks2Test(t, "--hash", "ripemd160")
+	runLuks2Test(t, 0, "--hash", "ripemd160")
 }
 
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
