@@ -1,5 +1,5 @@
-github.com/anatol/vmtest v0.0.0-20201214200054-5b4319ace2f0 h1:B8TRoIqx3f/kI2QLKOUd/oPaNXrNBMkpCZXkUYZz6Ek=
-github.com/anatol/vmtest v0.0.0-20201214200054-5b4319ace2f0/go.mod h1:EWbYrKMDMxiKbQjI7z6GO7yABGxqRkU3+slxy/avES8=
+github.com/anatol/vmtest v0.0.0-20201215024419-d0326c4b7734 h1:t2+NbgQAyVWDDwrr/OzB2t7jgJakUq65ZFe7Can+4I0=
+github.com/anatol/vmtest v0.0.0-20201215024419-d0326c4b7734/go.mod h1:EWbYrKMDMxiKbQjI7z6GO7yABGxqRkU3+slxy/avES8=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/tmc/scp v0.0.0-20170824174625-f7b48647feef h1:7D6Nm4D6f0ci9yttWaKjM1TMAXrH5Su72dojqYGntFY=
