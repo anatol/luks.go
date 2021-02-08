@@ -33,7 +33,7 @@ func createDmDevice(path string, dmName string, partitionUuid string, volume *vo
 	// A good explanation of dmsetup use is described here https://wiki.gentoo.org/wiki/Device-mapper
 	// dmsetup create test-crypt --table '0 1953125 crypt aes-xts-plain64 :32:user:test-cryptkey 0 /dev/loop0 0 1 allow_discards'
 	// parameters are based on https://www.kernel.org/doc/html/latest/admin-guide/device-mapper/dm-crypt.html
-	if err := dmIoctl(controlFile, unix.DM_DEV_CREATE, dmName, uuid, nil); err != nil {
+	if err := dmIoctl(controlFile, unix.DM_DEV_CREATE, dmName, uuid, false, nil); err != nil {
 		return err
 	}
 
@@ -56,12 +56,13 @@ func createDmDevice(path string, dmName string, partitionUuid string, volume *vo
 		args:        strings.Join(storageArg, " "),
 	}}
 
-	if err := dmIoctl(controlFile, unix.DM_TABLE_LOAD, dmName, "", spec); err != nil {
+	if err := dmIoctl(controlFile, unix.DM_TABLE_LOAD, dmName, "", false, spec); err != nil {
 		_ = Lock(dmName)
 		return err
 	}
 
-	if err := dmIoctl(controlFile, unix.DM_DEV_SUSPEND, dmName, "", nil); err != nil {
+	// it is actually a resume operation
+	if err := dmIoctl(controlFile, unix.DM_DEV_SUSPEND, dmName, "", true, nil); err != nil {
 		_ = Lock(dmName)
 		return err
 	}
@@ -76,9 +77,38 @@ type targetSpec struct {
 	args        string // see how it is generated at get_dm_crypt_params()
 }
 
-func dmIoctl(controlFile *os.File, cmd int, name string, uuid string, specs []targetSpec) error {
-	// allocate buffer large enough for dmioctl + specs
-	const alignment = 8
+// dmIoctl executes a device mapper ioctl
+// udevEvent is a boolean field that sets DM_UDEV_PRIMARY_SOURCE_FLAG udev flag.
+// This flag is later processed by rules at /usr/lib/udev/rules.d/10-dm.rules
+// Per devicecrypt sourcecode only RESUME, REMOVE, RENAME operations need to have DM_UDEV_PRIMARY_SOURCE_FLAG
+// flag set.
+func dmIoctl(controlFile *os.File, cmd int, name string, uuid string, udevEvent bool, specs []targetSpec) error {
+	const (
+		// allocate buffer large enough for dmioctl + specs
+		alignment = 8
+
+		DM_UDEV_FLAGS_SHIFT = 16
+		// Quoting https://fossies.org/linux/LVM2/libdm/libdevmapper.h
+		//
+		// DM_UDEV_PRIMARY_SOURCE_FLAG is automatically appended by
+		// libdevmapper for all ioctls generating udev uevents. Once used in
+		// udev rules, we know if this is a real "primary sourced" event or not.
+		// We need to distinguish real events originated in libdevmapper from
+		// any spurious events to gather all missing information (e.g. events
+		// generated as a result of "udevadm trigger" command or as a result
+		// of the "watch" udev rule).
+		DM_UDEV_PRIMARY_SOURCE_FLAG = 0x0040
+	)
+
+	var udevFlags uint32
+	if udevEvent {
+		// device mapper has a complex initialization sequence. A device need to be 1) created
+		// 2) load table 3) resumed. The device is usable at the 3rd step only.
+		// To make udev rules handle the device at 3rd step (rather than at ADD event), device mapper distinguishes
+		// the "primary" events with a udev flag set below.
+		// Only RESUME, REMOVE, RENAME operations are considered primary events.
+		udevFlags = DM_UDEV_PRIMARY_SOURCE_FLAG << DM_UDEV_FLAGS_SHIFT
+	}
 
 	length := unix.SizeofDmIoctl
 	for _, s := range specs {
@@ -95,6 +125,7 @@ func dmIoctl(controlFile *os.File, cmd int, name string, uuid string, specs []ta
 	ioctlData.Data_size = uint32(length)
 	ioctlData.Data_start = unix.SizeofDmIoctl
 	ioctlData.Target_count = uint32(len(specs))
+	ioctlData.Event_nr = udevFlags
 	idx += unix.SizeofDmIoctl
 
 	for _, s := range specs {

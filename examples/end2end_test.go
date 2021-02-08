@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/anatol/luks.go"
 	"github.com/tych0/go-losetup" // fork of github.com/freddierice/go-losetup
+	"golang.org/x/sys/unix"
 )
 
 // generate several LUKS disks, mount them as loop device and test end-to-end mount process
@@ -78,8 +80,9 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		}
 	}
 
+	expectedUUID := "462c8bc5-f997-4aa5-b97e-6346f5275521"
 	// format the crypt device with ext4 filesystem
-	formatExt4Cmd := exec.Command("mkfs.ext4", "-q", mapperFile)
+	formatExt4Cmd := exec.Command("mkfs.ext4", "-q", "-U", expectedUUID, mapperFile)
 	if testing.Verbose() {
 		formatExt4Cmd.Stdout = os.Stdout
 		formatExt4Cmd.Stderr = os.Stderr
@@ -160,6 +163,38 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
 	if err := ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666); err != nil {
 		log.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		stat, err := os.Stat(mapperFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sys, ok := stat.Sys().(*syscall.Stat_t)
+		if !ok {
+			t.Fatalf("Cannot determine the device major and minor numbers for %s", mapperFile)
+		}
+		major := unix.Major(sys.Rdev)
+		minor := unix.Minor(sys.Rdev)
+
+		udevFile := fmt.Sprintf("/run/udev/data/b%d:%d", major, minor)
+
+		fmt.Printf(">>> %s\n", udevFile)
+		content, err := ioutil.ReadFile(udevFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Print(string(content))
+	}
+
+	out, err = exec.Command("/usr/bin/lsblk", "-rno", "UUID", mapperFile).CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+
+	}
+	out = bytes.TrimRight(out, "\n")
+	if string(out) != expectedUUID {
+		t.Fatalf("lsblk output expected %s, got %s", expectedUUID, string(out))
 	}
 }
 

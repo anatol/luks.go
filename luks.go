@@ -104,5 +104,5 @@ func Lock(name string) error {
 	}
 	defer controlFile.Close()
 
-	return dmIoctl(controlFile, unix.DM_DEV_REMOVE, name, "", nil)
+	return dmIoctl(controlFile, unix.DM_DEV_REMOVE, name, "", true, nil)
 }
