@@ -82,7 +82,7 @@ type targetSpec struct {
 // This flag is later processed by rules at /usr/lib/udev/rules.d/10-dm.rules
 // Per devicecrypt sourcecode only RESUME, REMOVE, RENAME operations need to have DM_UDEV_PRIMARY_SOURCE_FLAG
 // flag set.
-func dmIoctl(controlFile *os.File, cmd int, name string, uuid string, udevEvent bool, specs []targetSpec) error {
+func dmIoctl(controlFile *os.File, cmd uint64, name string, uuid string, udevEvent bool, specs []targetSpec) error {
 	const (
 		// allocate buffer large enough for dmioctl + specs
 		alignment = 8
