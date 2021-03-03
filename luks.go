@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"golang.org/x/sys/unix"
+	"github.com/anatol/devmapper.go"
 )
 
 // error that indicates provided passphrase does not match
@@ -104,5 +104,5 @@ func Lock(name string) error {
 	}
 	defer controlFile.Close()
 
-	return dmIoctl(controlFile, unix.DM_DEV_REMOVE, name, "", true, nil)
+	return devmapper.Remove(name)
 }
