@@ -29,11 +29,11 @@ func createDmDevice(path string, dmName string, partitionUuid string, volume *vo
 		StartSector:   0,
 		Length:        volume.storageSize,
 		BackendDevice: path,
-		BackendOffset: int(volume.storageOffset),
+		BackendOffset: volume.storageOffset,
 		Encryption:    volume.storageEncryption,
 		Key:           string(key),
-		IVTweak:       int(volume.storageIvTweak),
+		IVTweak:       volume.storageIvTweak,
 		Flags:         kernelFlags,
 	}
-	return devmapper.CreateAndLoad(dmName, uuid, c)
+	return devmapper.CreateAndLoad(dmName, uuid, 0, c)
 }

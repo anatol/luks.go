@@ -1,5 +1,5 @@
-github.com/anatol/devmapper.go v0.0.0-20210303181210-ddf23678a654 h1:nRv2UETT7nh/N37cqCPzp2ezFBA1Ffvkoh8N/uhZYA8=
-github.com/anatol/devmapper.go v0.0.0-20210303181210-ddf23678a654/go.mod h1:5qHJYUjyhIxIAvqTYSeWtF2SZuIa+UEC628WzP9paNE=
+github.com/anatol/devmapper.go v0.0.0-20210309054337-e531cc1a9752 h1:i+gSapMrnO2kBwZVzR232OnGLteUbvv7OuYJzHfLa48=
+github.com/anatol/devmapper.go v0.0.0-20210309054337-e531cc1a9752/go.mod h1:5qHJYUjyhIxIAvqTYSeWtF2SZuIa+UEC628WzP9paNE=
 github.com/anatol/vmtest v0.0.0-20210225191124-26540db15d49 h1:WI65BVwIWBZqogBRSDRY3HqhJPkzKV1B8fbOV16LSCA=
 github.com/anatol/vmtest v0.0.0-20210225191124-26540db15d49/go.mod h1:EWbYrKMDMxiKbQjI7z6GO7yABGxqRkU3+slxy/avES8=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
