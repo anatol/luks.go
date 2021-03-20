@@ -98,11 +98,5 @@ func Open(path string) (Device, error) {
 
 // Lock closes device mapper partition with the given name
 func Lock(name string) error {
-	controlFile, err := os.Open("/dev/mapper/control")
-	if err != nil {
-		return err
-	}
-	defer controlFile.Close()
-
 	return devmapper.Remove(name)
 }
