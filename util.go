@@ -2,9 +2,16 @@ package luks
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
-	"golang.org/x/sys/unix"
+	"hash"
 	"os"
+
+	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/sha3"
+	"golang.org/x/sys/unix"
 )
 
 type volumeInfo struct {
@@ -57,5 +64,37 @@ func fixedArrayToString(buff []byte) string {
 func clearSlice(slice []byte) {
 	for i, _ := range slice {
 		slice[i] = 0
+	}
+}
+
+// getHashAlgo gets hash implementation and the hash size by its name
+// If hash is not found then it returns nil as a first argument
+func getHashAlgo(name string) (func() hash.Hash, int) {
+	// Note that cryptsetup support a few more hash algorithms not implemented here: whirlpool, stribog256, stribog512, sm3
+	// golang lib does not implement those
+	// TODO use third-party implementations for other hashes and add its support to luks.go
+	switch name {
+	case "sha1":
+		return sha1.New, sha1.Size
+	case "sha224":
+		return sha256.New224, sha256.Size224
+	case "sha256":
+		return sha256.New, sha256.Size
+	case "sha384":
+		return sha512.New384, sha512.Size384
+	case "sha512":
+		return sha512.New, sha512.Size
+	case "sha3-224":
+		return sha3.New224, 224 / 8
+	case "sha3-256":
+		return sha3.New256, 256 / 8
+	case "sha3-384":
+		return sha3.New384, 384 / 8
+	case "sha3-512":
+		return sha3.New512, 512 / 8
+	case "ripemd160":
+		return ripemd160.New, ripemd160.Size
+	default:
+		return nil, 0
 	}
 }

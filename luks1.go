@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
 	"hash"
@@ -15,8 +12,6 @@ import (
 	"unsafe"
 
 	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/crypto/ripemd160"
-	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/xts"
 )
 
@@ -157,9 +152,10 @@ func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	}
 	slot := keyslots[keyslotIdx]
 
-	h, err := luks1Hash(fixedArrayToString(d.hdr.HashSpec[:]))
-	if err != nil {
-		return nil, err
+	algo := fixedArrayToString(d.hdr.HashSpec[:])
+	h, _ := getHashAlgo(algo)
+	if h == nil {
+		return nil, fmt.Errorf("Unknown hash spec algorithm: %v", algo)
 	}
 
 	afKey := deriveLuks1AfKey(passphrase, slot, int(d.hdr.KeyBytes), h)
@@ -338,31 +334,4 @@ func luksMetaTokenType(uuid []byte) TokenType {
 
 func deriveLuks1AfKey(passphrase []byte, slot keySlot, keySize int, h func() hash.Hash) []byte {
 	return pbkdf2.Key(passphrase, slot.Salt[:], int(slot.Iterations), keySize, h)
-}
-
-func luks1Hash(hashSpecName string) (func() hash.Hash, error) {
-	switch hashSpecName {
-	case "sha1":
-		return sha1.New, nil
-	case "sha224":
-		return sha256.New224, nil
-	case "sha256":
-		return sha256.New, nil
-	case "sha384":
-		return sha512.New384, nil
-	case "sha512":
-		return sha512.New, nil
-	case "sha3-224":
-		return sha3.New224, nil
-	case "sha3-256":
-		return sha3.New256, nil
-	case "sha3-384":
-		return sha3.New384, nil
-	case "sha3-512":
-		return sha3.New512, nil
-	case "ripemd160":
-		return ripemd160.New, nil
-	default:
-		return nil, fmt.Errorf("Unknown hash spec algorithm: %v", hashSpecName)
-	}
 }
