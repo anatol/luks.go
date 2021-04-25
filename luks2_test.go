@@ -80,6 +80,10 @@ func TestLuks2UnlockSha3(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
 }
 
+func TestLuks2UnlockSha512(t *testing.T) {
+	runLuks2Test(t, 0, "--hash", "sha512")
+}
+
 func TestLuks2UnlockRipemd160(t *testing.T) {
 	// ripemd160 forces use of AF padding
 	runLuks2Test(t, 0, "--hash", "ripemd160")

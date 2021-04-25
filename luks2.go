@@ -341,6 +341,9 @@ func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, 
 		case "sha384":
 			h = sha512.New384
 			size = sha512.Size384
+		case "sha512":
+			h = sha512.New
+			size = sha512.Size
 		case "sha3-224":
 			h = sha3.New224
 			size = 224 / 8
@@ -426,6 +429,8 @@ func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey 
 		afHash = sha256.New()
 	case "sha384":
 		afHash = sha512.New384()
+	case "sha512":
+		afHash = sha512.New()
 	case "sha3-224":
 		afHash = sha3.New224()
 	case "sha3-256":

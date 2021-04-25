@@ -350,6 +350,8 @@ func luks1Hash(hashSpecName string) (func() hash.Hash, error) {
 		return sha256.New, nil
 	case "sha384":
 		return sha512.New384, nil
+	case "sha512":
+		return sha512.New, nil
 	case "sha3-224":
 		return sha3.New224, nil
 	case "sha3-256":

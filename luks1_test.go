@@ -78,6 +78,10 @@ func TestLuks1Sha256(t *testing.T) {
 	runLuks1Test(t, "--hash", "sha256")
 }
 
+func TestLuks1Sha512(t *testing.T) {
+	runLuks1Test(t, "--hash", "sha512")
+}
+
 func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 	t.Parallel()
 
