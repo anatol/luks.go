@@ -76,17 +76,18 @@ func TestLuks2UnlockNonZeroSlotId(t *testing.T) {
 	runLuks2Test(t, 4, "--key-slot", "4")
 }
 
-func TestLuks2UnlockSha3(t *testing.T) {
+func TestLuks2UnlockComplex(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
 }
 
-func TestLuks2UnlockSha512(t *testing.T) {
-	runLuks2Test(t, 0, "--hash", "sha512")
-}
-
-func TestLuks2UnlockRipemd160(t *testing.T) {
+func TestLuks2Hashes(t *testing.T) {
 	// ripemd160 forces use of AF padding
-	runLuks2Test(t, 0, "--hash", "ripemd160")
+	hashes := []string{"sha1", "sha224", "sha256", "sha384", "sha512", "sha3-224", "sha3-256", "sha3-384", "sha3-512", "ripemd160"}
+	for _, h := range hashes {
+		t.Run(h, func(t *testing.T) {
+			runLuks2Test(t, 0, "--hash", h)
+		})
+	}
 }
 
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
