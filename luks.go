@@ -9,20 +9,21 @@ import (
 	"github.com/anatol/devmapper.go"
 )
 
-// error that indicates provided passphrase does not match
+// ErrPassphraseDoesNotMatch is an error that indicates provided passphrase does not match
 var ErrPassphraseDoesNotMatch = fmt.Errorf("Passphrase does not match")
 
+// Device represents LUKS partition data
 type Device interface {
 	io.Closer
 	// Version returns version of LUKS disk
 	Version() int
 	// Path returns block device path
 	Path() string
-	// Uuid returns UUID of the LUKS partition
-	Uuid() string
+	// UUID returns UUID of the LUKS partition
+	UUID() string
 	// Slots returns list of all active slots for this device sorted by priority
 	Slots() []int
-	// Slots returns list of available tokens (metadata) for slots
+	// Tokens returns list of available tokens (metadata) for slots
 	Tokens() ([]Token, error)
 	// FlagsGet get the list of LUKS flags (options) used during unlocking
 	FlagsGet() []string
@@ -36,10 +37,13 @@ type Device interface {
 	UnlockAny(passphrase []byte, dmName string) error
 }
 
+// TokenType is LUKS token type
 type TokenType int
 
 const (
+	// UnknownTokenType type is not known
 	UnknownTokenType TokenType = iota
+	// ClevisTokenType represents clevis (https://github.com/latchset/clevis) token type
 	ClevisTokenType
 )
 
@@ -62,12 +66,15 @@ var flagsKernelNames = map[string]string{
 	FlagNoWriteWorkqueue:    "no_write_workqueue",
 }
 
+// Token represents LUKS token metadata information
 type Token struct {
 	Slots   []int
 	Type    TokenType
 	Payload []byte
 }
 
+// Open reads LUKS headers from the given partition and returns LUKS device object.
+// This function internally handles LUKS v1 and v2 partitions metadata.
 func Open(path string) (Device, error) {
 	f, err := os.Open(path)
 	if err != nil {

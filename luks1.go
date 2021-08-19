@@ -84,7 +84,7 @@ func (d *deviceV1) Slots() []int {
 	return slots
 }
 
-func (d *deviceV1) Uuid() string {
+func (d *deviceV1) UUID() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
@@ -124,7 +124,7 @@ func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
 		}
 	}
 
-	return createDmDevice(d.path, dmName, d.Uuid(), volume, d.flags)
+	return createDmDevice(d.path, dmName, d.UUID(), volume, d.flags)
 }
 
 func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
@@ -176,7 +176,7 @@ func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	encryption := fixedArrayToString(d.hdr.CipherName[:]) + "-" + fixedArrayToString(d.hdr.CipherMode[:])
 	info := &volumeInfo{
 		key:               finalKey,
-		digestId:          0,
+		digestID:          0,
 		luksType:          "LUKS1",
 		storageSize:       0, // dynamic size
 		storageOffset:     uint64(d.hdr.PayloadOffset),
@@ -240,11 +240,11 @@ func (d *deviceV1) buildLuks1AfCipher(afKey []byte) (*xts.Cipher, error) {
 
 var (
 	luksMetaMagic    = []byte("LUKSMETA")
-	luksMetaNullUuid = make([]byte, 16)
+	luksMetaNullUUID = make([]byte, 16)
 )
 
 type luksMetaSlot struct {
-	Uuid   [16]byte
+	UUID   [16]byte
 	Offset uint32
 	Length uint32
 	Crc32  uint32
@@ -297,7 +297,7 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 	}
 
 	for i, s := range hdr.Slots {
-		if !bytes.Equal(s.Uuid[:], luksMetaNullUuid) {
+		if !bytes.Equal(s.UUID[:], luksMetaNullUUID) {
 			payload := make([]byte, s.Length)
 			if _, err := d.f.ReadAt(payload, int64(holeOffset)+int64(s.Offset)); err != nil {
 				return nil, err
@@ -312,7 +312,7 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 
 			t := Token{
 				Slots:   []int{i},
-				Type:    luksMetaTokenType(s.Uuid[:]),
+				Type:    luksMetaTokenType(s.UUID[:]),
 				Payload: payload,
 			}
 			tokens = append(tokens, t)
@@ -322,14 +322,14 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 	return tokens, nil
 }
 
-var clevisUuid = []byte{0xcb, 0x6e, 0x89, 0x04, 0x81, 0xff, 0x40, 0xda, 0xa8, 0x4a, 0x07, 0xab, 0x9a, 0xb5, 0x71, 0x5e}
+var clevisUUID = []byte{0xcb, 0x6e, 0x89, 0x04, 0x81, 0xff, 0x40, 0xda, 0xa8, 0x4a, 0x07, 0xab, 0x9a, 0xb5, 0x71, 0x5e}
 
 func luksMetaTokenType(uuid []byte) TokenType {
-	if bytes.Equal(uuid, clevisUuid) {
+	if bytes.Equal(uuid, clevisUUID) {
 		return ClevisTokenType
-	} else {
-		return UnknownTokenType
 	}
+
+	return UnknownTokenType
 }
 
 func deriveLuks1AfKey(passphrase []byte, slot keySlot, keySize int, h func() hash.Hash) []byte {

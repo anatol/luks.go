@@ -49,7 +49,7 @@ func TestFromNulEndedSlice(t *testing.T) {
 	check([]byte{'\x00'}, "")
 }
 
-func blkdidUuid(filename string) (string, error) {
+func blkidUUID(filename string) (string, error) {
 	cmdOut, err := exec.Command("blkid", "-s", "UUID", "-o", "value", filename).CombinedOutput()
 	if err != nil {
 		return "", err

@@ -16,7 +16,7 @@ import (
 
 type volumeInfo struct {
 	key               []byte
-	digestId          int // id of the digest that matches the key
+	digestID          int // id of the digest that matches the key
 	luksType          string
 	storageEncryption string
 	storageIvTweak    uint64
@@ -62,7 +62,7 @@ func fixedArrayToString(buff []byte) string {
 }
 
 func clearSlice(slice []byte) {
-	for i, _ := range slice {
+	for i := range slice {
 		slice[i] = 0
 	}
 }

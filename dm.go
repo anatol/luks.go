@@ -8,8 +8,8 @@ import (
 	"github.com/anatol/devmapper.go"
 )
 
-func createDmDevice(path string, dmName string, partitionUuid string, volume *volumeInfo, flags []string) error {
-	uuid := fmt.Sprintf("CRYPT-%v-%v-%v", volume.luksType, strings.ReplaceAll(partitionUuid, "-", ""), dmName) // See dm_prepare_uuid()
+func createDmDevice(path string, dmName string, partitionUUID string, volume *volumeInfo, flags []string) error {
+	uuid := fmt.Sprintf("CRYPT-%v-%v-%v", volume.luksType, strings.ReplaceAll(partitionUUID, "-", ""), dmName) // See dm_prepare_uuid()
 
 	kernelFlags := make([]string, 0, len(flags))
 	for _, f := range flags {

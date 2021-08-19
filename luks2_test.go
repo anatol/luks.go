@@ -51,12 +51,12 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 		t.Fatal(err)
 	}
 
-	uuid, err := blkdidUuid(disk.Name())
+	uuid, err := blkidUUID(disk.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Uuid() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	if d.UUID() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
 	}
 
 	if _, err := d.decryptKeyslot(keySlot, []byte(password)); err != nil {
@@ -138,8 +138,8 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 	defer os.Remove(disk.Name())
 
 	addTokenCmd := exec.Command("cryptsetup", "token", "import", disk.Name())
-	slotId := 0
-	payload := fmt.Sprintf(`{"type":"clevis","keyslots":["%d"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`, slotId)
+	slotID := 0
+	payload := fmt.Sprintf(`{"type":"clevis","keyslots":["%d"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`, slotID)
 	addTokenCmd.Stdin = strings.NewReader(payload)
 	if testing.Verbose() {
 		addTokenCmd.Stdout = os.Stdout
@@ -180,12 +180,12 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 		t.Fatalf("Invalid token payload received, expected '%s', got '%s'", expected, p)
 	}
 
-	uuid, err := blkdidUuid(disk.Name())
+	uuid, err := blkidUUID(disk.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Uuid() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	if d.UUID() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
 	}
 
 	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {

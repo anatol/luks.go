@@ -61,12 +61,12 @@ func runLuks1Test(t *testing.T, cryptsetupArgs ...string) {
 		t.Fatal(err)
 	}
 
-	uuid, err := blkdidUuid(disk.Name())
+	uuid, err := blkidUUID(disk.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Uuid() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	if d.UUID() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
 	}
 }
 
@@ -190,12 +190,12 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 		t.Fatalf("Wrong metadata for slot %d, expected %s, got %s", 6, "testdata2", p2)
 	}
 
-	uuid, err := blkdidUuid(disk.Name())
+	uuid, err := blkidUUID(disk.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Uuid() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.Uuid())
+	if d.UUID() != uuid {
+		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
 	}
 
 	// check that we can unlock data for a partition with luks tokens

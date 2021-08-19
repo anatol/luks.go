@@ -59,7 +59,7 @@ type digest struct {
 }
 
 type config struct {
-	JsonSize     json.Number `json:"json_size"`
+	JSONSize     json.Number `json:"json_size"`
 	KeyslotsSize json.Number `json:"keyslots_size"`
 	Flags        []string    `json:"flags"`
 	Requirements []string    `json:"requirements"`

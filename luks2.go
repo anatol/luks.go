@@ -26,7 +26,7 @@ type headerV2 struct {
 	Magic             [6]byte
 	Version           uint16
 	HeaderSize        uint64
-	SequenceId        uint64
+	SequenceID        uint64
 	Label             [48]byte
 	ChecksumAlgorithm [32]byte
 	Salt              [64]byte
@@ -144,11 +144,11 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 
 		keyslots := make([]int, len(node.Keyslots))
 		for i, s := range node.Keyslots {
-			slotId, err := s.Int64()
+			slotID, err := s.Int64()
 			if err != nil {
 				return nil, err
 			}
-			keyslots[i] = int(slotId)
+			keyslots[i] = int(slotID)
 		}
 
 		token := Token{
@@ -172,7 +172,7 @@ func tokenType(t string) TokenType {
 	}
 }
 
-func (d *deviceV2) Uuid() string {
+func (d *deviceV2) UUID() string {
 	return fixedArrayToString(d.hdr.UUID[:])
 }
 
@@ -212,7 +212,7 @@ func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
 		}
 	}
 
-	return createDmDevice(d.path, dmName, d.Uuid(), volume, d.flags)
+	return createDmDevice(d.path, dmName, d.UUID(), volume, d.flags)
 }
 
 func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
@@ -303,7 +303,7 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 
 	info := &volumeInfo{
 		key:               finalKey,
-		digestId:          digIdx,
+		digestID:          digIdx,
 		luksType:          "LUKS2",
 		storageSize:       storageSize / uint64(storageSegment.SectorSize),
 		storageOffset:     uint64(offset) / uint64(storageSegment.SectorSize),
