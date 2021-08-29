@@ -179,7 +179,7 @@ func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 		digestID:          0,
 		luksType:          "LUKS1",
 		storageSize:       0, // dynamic size
-		storageOffset:     uint64(d.hdr.PayloadOffset),
+		storageOffset:     uint64(d.hdr.PayloadOffset) * storageSectorSize,
 		storageEncryption: encryption,
 		storageIvTweak:    0,
 		storageSectorSize: storageSectorSize,

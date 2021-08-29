@@ -91,6 +91,26 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		t.Fatal(err)
 	}
 
+	// try to mount it to ext4 filesystem
+	tmpMountpoint, err := ioutil.TempDir("", "luks.go.mount."+name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mount(mapperFile, tmpMountpoint, "ext4", 0, ""); err != nil {
+		t.Fatal(os.NewSyscallError("mount", err))
+	}
+
+	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
+	if err := ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666); err != nil {
+		log.Fatal(err)
+	}
+	if err := syscall.Unmount(tmpMountpoint, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(tmpMountpoint); err != nil {
+		t.Fatal(err)
+	}
+
 	// close the crypt device
 	closeCmd := exec.Command("cryptsetup", "close", name)
 	closeCmd.Stdin = strings.NewReader(password)
@@ -148,21 +168,23 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	time.Sleep(200 * time.Millisecond)
 
 	// try to mount it to ext4 filesystem
-	tmpMountpoint, err := ioutil.TempDir("", "luks.go.mount."+name)
+	tmpMountpoint2, err := ioutil.TempDir("", "luks.go.mount."+name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpMountpoint)
+	defer os.RemoveAll(tmpMountpoint2)
 
-	if err := syscall.Mount(mapperFile, tmpMountpoint, "ext4", 0, ""); err != nil {
+ 	if err := syscall.Mount(mapperFile, tmpMountpoint2, "ext4", 0, ""); err != nil {
 		t.Fatal(os.NewSyscallError("mount", err))
 	}
-	defer syscall.Unmount(tmpMountpoint, 0)
+	defer syscall.Unmount(tmpMountpoint2, 0)
 
-	// and then create an empty file to make sure the filesystem still works fine
-	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
-	if err := ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666); err != nil {
-		log.Fatal(err)
+	data, err := ioutil.ReadFile(filepath.Join(tmpMountpoint2, "empty.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "Hello, world!" {
+		t.Fatal("unexpected content in empty.txt")
 	}
 
 	if testing.Verbose() {

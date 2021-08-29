@@ -21,8 +21,8 @@ type volumeInfo struct {
 	storageEncryption string
 	storageIvTweak    uint64
 	storageSectorSize uint64
-	storageOffset     uint64 // offset of underlying storage in sectors
-	storageSize       uint64 // length of underlying device in sectors, zero means that size should be calculated using `diskSize` function
+	storageOffset     uint64 // offset of underlying storage in bytes
+	storageSize       uint64 // length of underlying device in bytes, zero means that size should be calculated using `diskSize` function
 }
 
 // default sector size
@@ -33,16 +33,15 @@ const stripesNum = 4000
 
 // computePartitionSize dynamically calculates the size of storage in sector size
 func computePartitionSize(f *os.File, volumeKey *volumeInfo) (uint64, error) {
-	s, err := unix.IoctlGetInt(int(f.Fd()), unix.BLKGETSIZE64)
+	size, err := unix.IoctlGetInt(int(f.Fd()), unix.BLKGETSIZE64)
 	if err != nil {
 		return 0, err
 	}
 
-	size := uint64(s) / volumeKey.storageSectorSize
-	if size < volumeKey.storageOffset {
-		return 0, fmt.Errorf("Block file size %v is smaller than LUKS segment offset %v", s, volumeKey.storageOffset)
+	if uint64(size) < volumeKey.storageOffset {
+		return 0, fmt.Errorf("Block file size %v is smaller than LUKS segment offset %v", size, volumeKey.storageOffset)
 	}
-	return size - volumeKey.storageOffset, nil
+	return uint64(size) - volumeKey.storageOffset, nil
 }
 
 func isPowerOfTwo(x uint) bool {

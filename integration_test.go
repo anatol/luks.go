@@ -15,20 +15,18 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func TestBootInQemu(t *testing.T) {
-	t.Parallel()
-
+func compileExamples() error {
 	cmd := exec.Command("go", "test", "-c", "examples/end2end_test.go", "-o", "luks_end2end_test")
 	if testing.Verbose() {
 		log.Print("compile in-qemu test binary")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
-	err := cmd.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove("luks_end2end_test")
+	return cmd.Run()
+}
+
+func withQemu(t *testing.T) {
+	t.Parallel()
 
 	// These integration tests use QEMU with a statically-compiled kernel (to avoid inintramfs) and a specially
 	// prepared rootfs. See [instructions](https://github.com/anatol/vmtest/blob/master/docs/prepare_image.md)
@@ -92,4 +90,32 @@ func TestBootInQemu(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// withRoot runs integration tests at the local host. It requires root permissions.
+func withRoot(t *testing.T) {
+	t.Parallel()
+
+	args := []string{"./luks_end2end_test", "-test.parallel", strconv.Itoa(runtime.NumCPU())}
+	if testing.Verbose() {
+		args = append(args, "-test.v")
+	}
+	cmd := exec.Command("sudo", args...)
+	if testing.Verbose() {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIntegration(t *testing.T) {
+	if err := compileExamples(); err != nil {
+		t.Fatal(err)
+	}
+	//defer os.Remove("luks_end2end_test")
+
+	t.Run("Qemu", withQemu)
+	t.Run("Root", withRoot)
 }
