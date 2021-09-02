@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anatol/vmtest"
+	"github.com/stretchr/testify/assert"
 	"github.com/tmc/scp"
 	"golang.org/x/crypto/ssh"
 )
@@ -46,9 +47,7 @@ func withQemu(t *testing.T) {
 	}
 	// Run QEMU instance
 	qemu, err := vmtest.NewQemu(&opts)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	// Shutdown QEMU at the end of the test case
 	defer qemu.Shutdown()
 
@@ -58,25 +57,17 @@ func withQemu(t *testing.T) {
 	}
 
 	conn, err := ssh.Dial("tcp", "localhost:10022", config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer conn.Close()
 
 	sess, err := conn.NewSession()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer sess.Close()
 
 	scpSess, err := conn.NewSession()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if err := scp.CopyPath("luks_end2end_test", "luks_end2end_test", scpSess); err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, scp.CopyPath("luks_end2end_test", "luks_end2end_test", scpSess))
 
 	testCmd := "./luks_end2end_test -test.parallel " + strconv.Itoa(runtime.NumCPU())
 	if testing.Verbose() {
@@ -87,9 +78,7 @@ func withQemu(t *testing.T) {
 	if testing.Verbose() {
 		fmt.Print(string(output))
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
 // withRoot runs integration tests at the local host. It requires root permissions.
@@ -105,15 +94,11 @@ func withRoot(t *testing.T) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, cmd.Run())
 }
 
 func TestIntegration(t *testing.T) {
-	if err := compileExamples(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, compileExamples())
 	//defer os.Remove("luks_end2end_test")
 
 	t.Run("Qemu", withQemu)

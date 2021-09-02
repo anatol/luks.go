@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func prepareLuks2Disk(password string, cryptsetupArgs ...string) (*os.File, error) {
@@ -40,28 +41,19 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 
 	password := "foobar"
 	disk, err := prepareLuks2Disk(password, cryptsetupArgs...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
 	d, err := initV2Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.UUID() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, uuid, d.UUID())
 
-	if _, err := d.decryptKeyslot(keySlot, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(keySlot, []byte(password))
+	assert.NoError(t, err)
 }
 
 func TestLuks2UnlockBasic(t *testing.T) {
@@ -95,9 +87,7 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 
 	password := "barfoo"
 	disk, err := prepareLuks2Disk(password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -109,21 +99,16 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 		addKeyCmd.Stdout = os.Stdout
 		addKeyCmd.Stderr = os.Stderr
 	}
-	if err := addKeyCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, addKeyCmd.Run())
 
 	d, err := initV2Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.decryptKeyslot(1, []byte(password2)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(0, []byte(password))
+	assert.NoError(t, err)
+
+	_, err = d.decryptKeyslot(1, []byte(password2))
+	assert.NoError(t, err)
 }
 
 func TestLuks2UnlockWithToken(t *testing.T) {
@@ -131,9 +116,7 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 
 	password := "foobar"
 	disk, err := prepareLuks2Disk(password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -145,50 +128,30 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 		addTokenCmd.Stdout = os.Stdout
 		addTokenCmd.Stderr = os.Stderr
 	}
-	if err := addTokenCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, addTokenCmd.Run())
 
 	d, err := initV2Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	slots := d.Slots()
-	if len(slots) != 1 && slots[0] != 0 {
-		t.Fatalf("Invalid slots data")
-	}
+	assert.Len(t, slots, 1)
+	assert.Equal(t, 0, slots[0])
 
 	tokens, err := d.Tokens()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tokens) != 1 {
-		t.Fatalf("Expected 1 token, got %d", len(tokens))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, tokens, 1)
+
 	tk := tokens[0]
-	if tk.Type != "clevis" {
-		t.Fatalf("Expected 'clevis' token type, got %s", tk.Type)
-	}
-	if !reflect.DeepEqual(tk.Slots, []int{0}) {
-		t.Fatalf("Expected '0' slotid, got %+v", tk.Slots)
-	}
+	assert.Equal(t, "clevis", tk.Type)
+	assert.Equal(t, []int{0}, tk.Slots)
 
 	expected := `{"type":"clevis","keyslots":["0"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`
-	p := string(tk.Payload)
-	if p != expected {
-		t.Fatalf("Invalid token payload received, expected '%s', got '%s'", expected, p)
-	}
+	assert.Equal(t, expected, string(tk.Payload))
 
 	uuid, err := blkidUUID(disk.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.UUID() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, uuid, d.UUID())
 
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(0, []byte(password))
+	assert.NoError(t, err)
 }

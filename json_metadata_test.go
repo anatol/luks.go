@@ -2,25 +2,18 @@ package luks
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
 )
 
 func parseMetadata(t *testing.T, filename string) {
 	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	var meta metadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatal(err)
-	}
-
-	if meta.Keyslots[0].Af.Stripes != 4000 {
-		t.Fatalf("keyslots[0].af.stripes expected to be %v was %v",
-			4000, meta.Keyslots[0].Af.Stripes)
-	}
+	assert.NoError(t, json.Unmarshal(data, &meta))
+	assert.Equal(t, uint(4000), meta.Keyslots[0].Af.Stripes)
 }
 
 func TestParseMetadata(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/anatol/luks.go"
+	"github.com/stretchr/testify/assert"
 	"github.com/tych0/go-losetup" // fork of github.com/freddierice/go-losetup
 	"golang.org/x/sys/unix"
 )
@@ -23,15 +23,11 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	t.Parallel()
 
 	tmpImage, err := ioutil.TempFile("", "luks.go.img."+name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer tmpImage.Close()
 	defer os.Remove(tmpImage.Name())
 
-	if err := tmpImage.Truncate(24 * 1024 * 1024); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, tmpImage.Truncate(24*1024*1024))
 
 	mapperFile := "/dev/mapper/" + name
 	password := "pwd." + name
@@ -46,15 +42,11 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		formatCmd.Stdout = os.Stdout
 		formatCmd.Stderr = os.Stderr
 	}
-	if err := formatCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, formatCmd.Run())
 
 	// attach the luks image to a loop device
 	loopDev, err := losetup.Attach(tmpImage.Name(), 0, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer loopDev.Detach()
 
 	// open the loop device
@@ -64,9 +56,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		openCmd.Stdout = os.Stdout
 		openCmd.Stderr = os.Stderr
 	}
-	if err := openCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, openCmd.Run())
 
 	if testPersistentFlags {
 		refreshCmd := exec.Command("cryptsetup", "refresh", "--persistent", "--allow-discards", name)
@@ -75,9 +65,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 			refreshCmd.Stdout = os.Stdout
 			refreshCmd.Stderr = os.Stderr
 		}
-		if err := refreshCmd.Run(); err != nil {
-			t.Fatalf("Setting persistent flags failed: %v", err)
-		}
+		assert.NoError(t, refreshCmd.Run())
 	}
 
 	expectedUUID := "462c8bc5-f997-4aa5-b97e-6346f5275521"
@@ -87,29 +75,19 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		formatExt4Cmd.Stdout = os.Stdout
 		formatExt4Cmd.Stderr = os.Stderr
 	}
-	if err := formatExt4Cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, formatExt4Cmd.Run())
 
 	// try to mount it to ext4 filesystem
 	tmpMountpoint, err := ioutil.TempDir("", "luks.go.mount."+name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	if err := syscall.Mount(mapperFile, tmpMountpoint, "ext4", 0, ""); err != nil {
-		t.Fatal(os.NewSyscallError("mount", err))
+		assert.Error(t, os.NewSyscallError("mount", err))
 	}
 
 	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
-	if err := ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666); err != nil {
-		log.Fatal(err)
-	}
-	if err := syscall.Unmount(tmpMountpoint, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(tmpMountpoint); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666))
+	assert.NoError(t, syscall.Unmount(tmpMountpoint, 0))
+	assert.NoError(t, os.RemoveAll(tmpMountpoint))
 
 	// close the crypt device
 	closeCmd := exec.Command("cryptsetup", "close", name)
@@ -118,41 +96,27 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		closeCmd.Stdout = os.Stdout
 		closeCmd.Stderr = os.Stderr
 	}
-	if err := closeCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, closeCmd.Run())
 
 	_, err = os.Stat(mapperFile)
-	if err == nil || !os.IsNotExist(err) {
-		t.Fatalf("It is expected file /dev/mapper/%v does not exist", name)
-	}
+	assert.False(t, err == nil || !os.IsNotExist(err), "It is expected file /dev/mapper/%v does not exist", name)
 
 	dev, err := luks.Open(loopDev.Path())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer dev.Close()
 
-	if err := dev.FlagsAdd(luks.FlagNoReadWorkqueue, luks.FlagSubmitFromCryptCPUs, luks.FlagNoReadWorkqueue /* this is dup */); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, dev.FlagsAdd(luks.FlagNoReadWorkqueue, luks.FlagSubmitFromCryptCPUs, luks.FlagNoReadWorkqueue /* this is dup */))
 	if testPersistentFlags {
 		// test adding duplicated flag
-		if err := dev.FlagsAdd(luks.FlagAllowDiscards); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, dev.FlagsAdd(luks.FlagAllowDiscards))
 	}
 
 	// open the crypt device again, this time with our Golang API
-	if err := dev.Unlock(0, []byte(password), name); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, dev.Unlock(0, []byte(password), name))
 	defer luks.Lock(name)
 
 	out, err := exec.Command("cryptsetup", "status", name).CombinedOutput()
-	if err != nil {
-		t.Fatalf("Unable to get status of volume %v", name)
-	}
+	assert.NoError(t, err, "Unable to get status of volume %v", name)
 
 	var expectedFlags string
 	if testPersistentFlags {
@@ -160,42 +124,30 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	} else {
 		expectedFlags = "submit_from_crypt_cpus no_read_workqueue"
 	}
-	if !bytes.Contains(out, []byte("  flags:   "+expectedFlags+" \n")) {
-		t.Fatalf("Expected LUKS flags '%v', got:\n%v", expectedFlags, string(out))
-	}
+	assert.Contains(t, string(out), "  flags:   "+expectedFlags+" \n", "expected LUKS flags '%v', got:\n%v", expectedFlags, string(out))
 
 	// dm-crypt mount is an asynchronous process, we need to wait a bit until /dev/mapper/ file appears
 	time.Sleep(200 * time.Millisecond)
 
 	// try to mount it to ext4 filesystem
 	tmpMountpoint2, err := ioutil.TempDir("", "luks.go.mount."+name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.RemoveAll(tmpMountpoint2)
 
- 	if err := syscall.Mount(mapperFile, tmpMountpoint2, "ext4", 0, ""); err != nil {
-		t.Fatal(os.NewSyscallError("mount", err))
+	if err := syscall.Mount(mapperFile, tmpMountpoint2, "ext4", 0, ""); err != nil {
+		assert.Error(t, os.NewSyscallError("mount", err))
 	}
 	defer syscall.Unmount(tmpMountpoint2, 0)
 
 	data, err := ioutil.ReadFile(filepath.Join(tmpMountpoint2, "empty.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) != "Hello, world!" {
-		t.Fatal("unexpected content in empty.txt")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello, world!", string(data))
 
 	if testing.Verbose() {
 		stat, err := os.Stat(mapperFile)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		sys, ok := stat.Sys().(*syscall.Stat_t)
-		if !ok {
-			t.Fatalf("Cannot determine the device major and minor numbers for %s", mapperFile)
-		}
+		assert.True(t, ok, "Cannot determine the device major and minor numbers for %s", mapperFile)
 		major := unix.Major(sys.Rdev)
 		minor := unix.Minor(sys.Rdev)
 
@@ -203,21 +155,14 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 
 		fmt.Printf(">>> %s\n", udevFile)
 		content, err := ioutil.ReadFile(udevFile)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		fmt.Print(string(content))
 	}
 
 	out, err = exec.Command("/usr/bin/lsblk", "-rno", "UUID", mapperFile).CombinedOutput()
-	if err != nil {
-		log.Fatal(err)
-
-	}
+	assert.NoError(t, err)
 	out = bytes.TrimRight(out, "\n")
-	if string(out) != expectedUUID {
-		t.Fatalf("lsblk output expected %s, got %s", expectedUUID, string(out))
-	}
+	assert.Equal(t, expectedUUID, string(out))
 }
 
 func TestLUKS1(t *testing.T) {

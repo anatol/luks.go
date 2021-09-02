@@ -6,17 +6,14 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func prepareLuks1Disk(t *testing.T, password string, cryptsetupArgs ...string) (*os.File, error) {
 	disk, err := ioutil.TempFile("", "luksv1.go.disk")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := disk.Truncate(2 * 1024 * 1024); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+	assert.NoError(t, disk.Truncate(2*1024*1024))
 
 	args := []string{"luksFormat", "--type", "luks1", "--iter-time", "5", "-q", disk.Name()}
 	args = append(args, cryptsetupArgs...)
@@ -27,9 +24,7 @@ func prepareLuks1Disk(t *testing.T, password string, cryptsetupArgs ...string) (
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, cmd.Run())
 	return disk, err
 }
 
@@ -38,36 +33,23 @@ func runLuks1Test(t *testing.T, cryptsetupArgs ...string) {
 
 	password := "foobar"
 	disk, err := prepareLuks1Disk(t, password, cryptsetupArgs...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
 	d, err := initV1Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	tokens, err := d.Tokens()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tokens) != 0 {
-		t.Fatal("Expected an empty metadata")
-	}
+	assert.NoError(t, err)
+	assert.Empty(t, tokens)
 
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(0, []byte(password))
+	assert.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.UUID() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, uuid, d.UUID())
 }
 
 func TestLuks1Unlock(t *testing.T) {
@@ -87,9 +69,7 @@ func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 
 	password := "barfoo"
 	disk, err := prepareLuks1Disk(t, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -101,29 +81,20 @@ func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 		addKeyCmd.Stdout = os.Stdout
 		addKeyCmd.Stderr = os.Stderr
 	}
-	if err := addKeyCmd.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, addKeyCmd.Run())
 
 	d, err := initV1Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	tokens, err := d.Tokens()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tokens) != 0 {
-		t.Fatal("Expected an empty metadata")
-	}
+	assert.NoError(t, err)
+	assert.Empty(t, tokens)
 
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.decryptKeyslot(1, []byte(password2)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(0, []byte(password))
+	assert.NoError(t, err)
+
+	_, err = d.decryptKeyslot(1, []byte(password2))
+	assert.NoError(t, err)
 }
 
 func TestReadLuksMetaInitialized(t *testing.T) {
@@ -131,9 +102,7 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 
 	password := "barfoo"
 	disk, err := prepareLuks1Disk(t, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -143,9 +112,7 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 		initMeta.Stdout = os.Stdout
 		initMeta.Stderr = os.Stderr
 	}
-	if err := initMeta.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, initMeta.Run())
 
 	uuid1 := "6a6888f3-445d-479b-bc39-1b64e7215464"
 	saveMeta1 := exec.Command("luksmeta", "save", "-d", disk.Name(), "-s", "3", "-u", uuid1)
@@ -154,9 +121,7 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 		saveMeta1.Stdout = os.Stdout
 		saveMeta1.Stderr = os.Stderr
 	}
-	if err := saveMeta1.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, saveMeta1.Run())
 
 	uuid2 := "f1e1503f-6123-4369-a0fc-58bbe0df93c0"
 	saveMeta2 := exec.Command("luksmeta", "save", "-d", disk.Name(), "-s", "6", "-u", uuid2)
@@ -165,41 +130,26 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 		saveMeta2.Stdout = os.Stdout
 		saveMeta2.Stderr = os.Stderr
 	}
-	if err := saveMeta2.Run(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, saveMeta2.Run())
 
 	d, err := initV1Device(disk.Name(), disk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	tokens, err := d.Tokens()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tokens) != 2 {
-		t.Fatal("Expected metadata with 2 elements")
-	}
-	p1 := string(tokens[0].Payload)
-	if p1 != "testdata1" {
-		t.Fatalf("Wrong metadata for slot %d, expected %s, got %s", 3, "testdata1", p1)
-	}
-	p2 := string(tokens[1].Payload)
-	if p2 != "testdata2" {
-		t.Fatalf("Wrong metadata for slot %d, expected %s, got %s", 6, "testdata2", p2)
-	}
+	assert.NoError(t, err)
+	assert.Len(t, tokens, 2)
+	t1 := tokens[0]
+	assert.Equal(t, 3, t1.ID)
+	assert.Equal(t, "testdata1", string(t1.Payload), "Wrong metadata for token %d", t1.ID)
+	t2 := tokens[1]
+	assert.Equal(t, 6, t2.ID)
+	assert.Equal(t, "testdata2", string(t2.Payload), "Wrong metadata for token %d", t2.ID)
 
 	uuid, err := blkidUUID(disk.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.UUID() != uuid {
-		t.Fatalf("wrong UUID: expected %s, got %s", uuid, d.UUID())
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, uuid, d.UUID())
 
 	// check that we can unlock data for a partition with luks tokens
-	if _, err := d.decryptKeyslot(0, []byte(password)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = d.decryptKeyslot(0, []byte(password))
+	assert.NoError(t, err)
 }

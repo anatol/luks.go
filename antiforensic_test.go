@@ -1,11 +1,11 @@
 package luks
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"hash"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -21,22 +21,13 @@ func runAntiforensicTest(t *testing.T, hash hash.Hash) {
 	secret = secret[:keySize] // expand input data to its key size
 
 	dest, err := afSplit(secret, stripes, hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(dest) != 64*4000 {
-		t.Fatal()
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, 64*4000, len(dest))
 
 	final, err := afMerge(dest, keySize, stripes, hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if !bytes.Equal(secret, final) {
-		t.Fatal()
-	}
+	assert.Equal(t, secret, final)
 }
 
 func TestAntiforensicSha256(t *testing.T) {

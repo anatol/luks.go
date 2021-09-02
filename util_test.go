@@ -4,6 +4,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsPowerOf2(t *testing.T) {
@@ -11,35 +13,23 @@ func TestIsPowerOf2(t *testing.T) {
 	invalid := []uint{3, 5, 9, 323, 34322, 6521212322}
 
 	for _, v := range valid {
-		if !isPowerOfTwo(v) {
-			t.Fatalf("Number %v is reported as not power of 2", v)
-		}
+		assert.True(t, isPowerOfTwo(v))
 	}
 
 	for _, v := range invalid {
-		if isPowerOfTwo(v) {
-			t.Fatalf("Number %v is reported as power of 2", v)
-		}
+		assert.False(t, isPowerOfTwo(v))
 	}
 }
 
 func TestRundup(t *testing.T) {
-	compare := func(expected, got int) {
-		if expected != got {
-			t.Fatalf("expected %v, got %v", expected, got)
-		}
-	}
-
-	compare(0, roundUp(0, 8))
-	compare(8, roundUp(1, 8))
+	assert.Equal(t, 0, roundUp(0, 8))
+	assert.Equal(t, 8, roundUp(1, 8))
 }
 
 func TestFromNulEndedSlice(t *testing.T) {
 	check := func(input []byte, expected string) {
 		str := fixedArrayToString(input)
-		if str != expected {
-			t.Fatalf("Expected string %v, got %v", expected, str)
-		}
+		assert.Equal(t, expected, str)
 	}
 
 	check([]byte{}, "")
