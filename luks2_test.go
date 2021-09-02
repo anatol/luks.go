@@ -167,8 +167,8 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 		t.Fatalf("Expected 1 token, got %d", len(tokens))
 	}
 	tk := tokens[0]
-	if tk.Type != ClevisTokenType {
-		t.Fatalf("Expected clevis token type, got %d", tk.Type)
+	if tk.Type != "clevis" {
+		t.Fatalf("Expected 'clevis' token type, got %s", tk.Type)
 	}
 	if !reflect.DeepEqual(tk.Slots, []int{0}) {
 		t.Fatalf("Expected '0' slotid, got %+v", tk.Slots)

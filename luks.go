@@ -37,16 +37,6 @@ type Device interface {
 	UnlockAny(passphrase []byte, dmName string) error
 }
 
-// TokenType is LUKS token type
-type TokenType int
-
-const (
-	// UnknownTokenType type is not known
-	UnknownTokenType TokenType = iota
-	// ClevisTokenType represents clevis (https://github.com/latchset/clevis) token type
-	ClevisTokenType
-)
-
 // List of options handled by luks.go API.
 // These names correspond to LUKSv2 persistent flags names (see persistent_flags[] array).
 const (
@@ -68,8 +58,9 @@ var flagsKernelNames = map[string]string{
 
 // Token represents LUKS token metadata information
 type Token struct {
-	Slots   []int
-	Type    TokenType
+	Slots []int
+	// Type of the token e.g. "clevis", "systemd-fido2"
+	Type    string
 	Payload []byte
 }
 

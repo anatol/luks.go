@@ -153,7 +153,7 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 
 		token := Token{
 			Slots:   keyslots,
-			Type:    tokenType(node.Type),
+			Type:    node.Type,
 			Payload: t,
 		}
 
@@ -161,15 +161,6 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 	}
 
 	return tokens, nil
-}
-
-func tokenType(t string) TokenType {
-	switch t {
-	case "clevis":
-		return ClevisTokenType
-	default:
-		return UnknownTokenType
-	}
 }
 
 func (d *deviceV2) UUID() string {

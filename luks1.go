@@ -324,12 +324,12 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 
 var clevisUUID = []byte{0xcb, 0x6e, 0x89, 0x04, 0x81, 0xff, 0x40, 0xda, 0xa8, 0x4a, 0x07, 0xab, 0x9a, 0xb5, 0x71, 0x5e}
 
-func luksMetaTokenType(uuid []byte) TokenType {
+func luksMetaTokenType(uuid []byte) string {
 	if bytes.Equal(uuid, clevisUUID) {
-		return ClevisTokenType
+		return "clevis"
 	}
 
-	return UnknownTokenType
+	return ""
 }
 
 func deriveLuks1AfKey(passphrase []byte, slot keySlot, keySize int, h func() hash.Hash) []byte {
