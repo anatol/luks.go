@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -418,6 +419,8 @@ func deriveLuks2AfKey(kdf kdf, keyslotIdx int, passphrase []byte, keyLength uint
 		switch kdf.Hash {
 		case "sha256":
 			h = sha256.New
+		case "sha512":
+			h = sha512.New
 		default:
 			return nil, fmt.Errorf("Unknown keyslotIdx[%v].kdf.hash algorithm: %v", keyslotIdx, kdf.Hash)
 		}
