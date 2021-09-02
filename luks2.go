@@ -144,12 +144,12 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 		}
 
 		keyslots := make([]int, len(node.Keyslots))
-		for i, s := range node.Keyslots {
+		for j, s := range node.Keyslots {
 			slotID, err := s.Int64()
 			if err != nil {
 				return nil, err
 			}
-			keyslots[i] = int(slotID)
+			keyslots[j] = int(slotID)
 		}
 
 		token := Token{
