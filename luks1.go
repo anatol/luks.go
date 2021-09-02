@@ -311,6 +311,7 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 			}
 
 			t := Token{
+				ID:      i,
 				Slots:   []int{i},
 				Type:    luksMetaTokenType(s.UUID[:]),
 				Payload: payload,

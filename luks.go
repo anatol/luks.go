@@ -58,6 +58,7 @@ var flagsKernelNames = map[string]string{
 
 // Token represents LUKS token metadata information
 type Token struct {
+	ID    int
 	Slots []int
 	// Type of the token e.g. "clevis", "systemd-fido2"
 	Type    string

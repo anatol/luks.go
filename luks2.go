@@ -136,7 +136,7 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 		Keyslots []json.Number
 	}
 
-	for _, t := range d.meta.Tokens {
+	for i, t := range d.meta.Tokens {
 		var node tokenNode
 		if err := json.Unmarshal(t, &node); err != nil {
 			return nil, err
@@ -152,6 +152,7 @@ func (d *deviceV2) Tokens() ([]Token, error) {
 		}
 
 		token := Token{
+			ID:      i,
 			Slots:   keyslots,
 			Type:    node.Type,
 			Payload: t,
