@@ -9,6 +9,8 @@ import (
 	"hash"
 	"os"
 
+	"golang.org/x/crypto/blake2b"
+	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/sys/unix"
@@ -93,7 +95,39 @@ func getHashAlgo(name string) (func() hash.Hash, int) {
 		return sha3.New512, 512 / 8
 	case "ripemd160":
 		return ripemd160.New, ripemd160.Size
+	case "blake2b-160":
+		return blake2bConstructor(160)
+	case "blake2b-256":
+		return blake2bConstructor(256)
+	case "blake2b-384":
+		return blake2bConstructor(384)
+	case "blake2b-512":
+		return blake2bConstructor(512)
+	case "blake2s-256":
+		// blake2s-{128,160,224} are not supported by golang crypto library
+		return blake2s256Constructor()
 	default:
 		return nil, 0
 	}
+}
+
+func blake2bConstructor(size int) (func() hash.Hash, int) {
+	size = size / 8
+	return func() hash.Hash {
+		h, err := blake2b.New(size, nil)
+		if err != nil {
+			panic(err)
+		}
+		return h
+	}, size
+}
+
+func blake2s256Constructor() (func() hash.Hash, int) {
+	return func() hash.Hash {
+		h, err := blake2s.New256(nil)
+		if err != nil {
+			panic(err)
+		}
+		return h
+	}, 256 / 8
 }

@@ -74,7 +74,8 @@ func TestLuks2UnlockComplex(t *testing.T) {
 
 func TestLuks2Hashes(t *testing.T) {
 	// ripemd160 forces use of AF padding
-	hashes := []string{"sha1", "sha224", "sha256", "sha384", "sha512", "sha3-224", "sha3-256", "sha3-384", "sha3-512", "ripemd160"}
+	// It looks like cryptsetup 2.4.0 at Arch Linux defaults to openssl backend that supports blake2b-512 and blake2s-256 only. "blake2b-160", "blake2b-256", "blake2b-384" tests are failing thus disabling it for now.
+	hashes := []string{"sha1", "sha224", "sha256", "sha384", "sha512", "sha3-224", "sha3-256", "sha3-384", "sha3-512", "ripemd160", "blake2b-512", "blake2s-256"}
 	for _, h := range hashes {
 		t.Run(h, func(t *testing.T) {
 			runLuks2Test(t, 0, "--hash", h)
