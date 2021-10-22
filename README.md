@@ -7,7 +7,7 @@ any modifications to LUKS metadata header.
 
 Here is an example that demonstrates the API usage:
 ```go
-dev, err := luks.Open("/dev/sda1");
+dev, err := luks.Open("/dev/sda1")
 if err != nil {
   // handle error
 }
@@ -18,13 +18,14 @@ if err := dev.FlagsAdd(luks.FlagNoReadWorkqueue, luks.FlagNoWriteWorkqueue); err
     log.Print(err)
 }
 
-// equivalent of `cryptsetup open /dev/sda1 volumename`
-err = dev.Unlock(/* slot */ 0, []byte("password"), "volumename")
+// UnsealVolume+SetupMapper is equivalent of `cryptsetup open /dev/sda1 volumename`
+volume, err = dev.UnsealVolume(/* slot */ 0, []byte("password"))
 if err == luks.ErrPassphraseDoesNotMatch {
     log.Printf("The password is incorrect")
 } else if err != nil {
     log.Print(err)
 } else {
+    err := volume.SetupMapper("volumename")
     // at this point system should have a file `/dev/mapper/volumename`.
 }
 

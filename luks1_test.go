@@ -44,7 +44,7 @@ func runLuks1Test(t *testing.T, cryptsetupArgs ...string) {
 	assert.NoError(t, err)
 	assert.Empty(t, tokens)
 
-	_, err = d.decryptKeyslot(0, []byte(password))
+	_, err = d.UnsealVolume(0, []byte(password))
 	assert.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())
@@ -90,10 +90,10 @@ func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, tokens)
 
-	_, err = d.decryptKeyslot(0, []byte(password))
+	_, err = d.UnsealVolume(0, []byte(password))
 	assert.NoError(t, err)
 
-	_, err = d.decryptKeyslot(1, []byte(password2))
+	_, err = d.UnsealVolume(1, []byte(password2))
 	assert.NoError(t, err)
 }
 
@@ -150,6 +150,6 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 	assert.Equal(t, uuid, d.UUID())
 
 	// check that we can unlock data for a partition with luks tokens
-	_, err = d.decryptKeyslot(0, []byte(password))
+	_, err = d.UnsealVolume(0, []byte(password))
 	assert.NoError(t, err)
 }

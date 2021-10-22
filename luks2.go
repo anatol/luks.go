@@ -192,37 +192,30 @@ func (d *deviceV2) Version() int {
 }
 
 func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
-	volume, err := d.decryptKeyslot(keyslot, passphrase)
+	volume, err := d.UnsealVolume(keyslot, passphrase)
 	if err != nil {
 		return err
 	}
 	defer clearSlice(volume.key)
 
-	if volume.storageSize == 0 {
-		volume.storageSize, err = computePartitionSize(d.f, volume)
-		if err != nil {
-			return err
-		}
-	}
-
-	return createDmDevice(d.path, dmName, d.UUID(), volume, d.flags)
+	return volume.SetupMapper(dmName)
 }
 
 func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
-	for _, k := range d.Slots() {
-		err := d.Unlock(k, passphrase, dmName)
-		if err == nil {
-			return nil
-		} else if err == ErrPassphraseDoesNotMatch {
+	for _, s := range d.Slots() {
+		volume, err := d.UnsealVolume(s, passphrase)
+		if err == ErrPassphraseDoesNotMatch {
 			continue
-		} else {
+		} else if err != nil {
 			return err
 		}
+
+		return volume.SetupMapper(dmName)
 	}
 	return ErrPassphraseDoesNotMatch
 }
 
-func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
+func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, error) {
 	keyslots := d.meta.Keyslots
 
 	keyslot, ok := keyslots[keyslotIdx]
@@ -242,18 +235,18 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	}
 
 	// verify with digest
-	digIdx, digInfo := d.findDigestForKeyslot(keyslotIdx)
-	if digInfo == nil {
+	digest := d.findDigestForKeyslot(keyslotIdx)
+	if digest == nil {
 		return nil, fmt.Errorf("No digest is found for keyslot %v", keyslotIdx)
 	}
 
-	generatedDigest, err := computeDigestForKey(digInfo, keyslotIdx, finalKey)
+	generatedDigest, err := computeDigestForKey(digest, keyslotIdx, finalKey)
 	if err != nil {
 		return nil, err
 	}
 	defer clearSlice(generatedDigest)
 
-	expectedDigest, err := base64.StdEncoding.DecodeString(digInfo.Digest)
+	expectedDigest, err := base64.StdEncoding.DecodeString(digest.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("keyslotIdx[%v].digest.Digest base64 parsing failed: %v", keyslotIdx, err)
 	}
@@ -262,10 +255,10 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	}
 	clearSlice(generatedDigest)
 
-	if len(digInfo.Segments) != 1 {
-		return nil, fmt.Errorf("LUKS partition expects exactly 1 storage segment, got %+v", len(digInfo.Segments))
+	if len(digest.Segments) != 1 {
+		return nil, fmt.Errorf("LUKS partition expects exactly 1 storage segment, got %+v", len(digest.Segments))
 	}
-	seg, err := digInfo.Segments[0].Int64()
+	seg, err := digest.Segments[0].Int64()
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +270,17 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	}
 
 	var storageSize uint64
-	if storageSegment.Size != "dynamic" {
+	if storageSegment.Size == "dynamic" {
+		storageSize, err = fileSize(d.f)
+		if err != nil {
+			return nil, err
+		}
+		if storageSize < uint64(offset) {
+			return nil, fmt.Errorf("backing file size %d is smaller than LUKS segment offset %d", storageSize, offset)
+		}
+
+		storageSize -= uint64(offset)
+	} else {
 		size, err := strconv.Atoi(storageSegment.Size)
 		if err != nil {
 			return nil, err
@@ -294,9 +297,11 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 		return nil, err
 	}
 
-	info := &volumeInfo{
+	v := &Volume{
+		backingDevice:     d.path,
+		flags:             d.flags,
+		uuid:              d.UUID(),
 		key:               finalKey,
-		digestID:          digIdx,
 		luksType:          "LUKS2",
 		storageSize:       storageSize,
 		storageOffset:     uint64(offset),
@@ -304,7 +309,7 @@ func (d *deviceV2) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 		storageIvTweak:    uint64(ivTweak),
 		storageSectorSize: uint64(storageSegment.SectorSize),
 	}
-	return info, nil
+	return v, nil
 }
 
 func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, error) {
@@ -434,17 +439,17 @@ func deriveLuks2AfKey(kdf kdf, keyslotIdx int, passphrase []byte, keyLength uint
 	}
 }
 
-func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) (int, *digest) {
-	for i, dig := range d.meta.Digests {
+func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) *digest {
+	for _, dig := range d.meta.Digests {
 		for _, k := range dig.Keyslots {
 			k, e := k.Int64()
 			if e != nil {
 				continue
 			}
 			if int(k) == keyslotIdx {
-				return i, &dig
+				return &dig
 			}
 		}
 	}
-	return 0, nil
+	return nil
 }

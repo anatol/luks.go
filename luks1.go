@@ -111,20 +111,13 @@ func (d *deviceV1) Version() int {
 }
 
 func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
-	volume, err := d.decryptKeyslot(keyslot, passphrase)
+	volume, err := d.UnsealVolume(keyslot, passphrase)
 	if err != nil {
 		return err
 	}
 	defer clearSlice(volume.key)
 
-	if volume.storageSize == 0 {
-		volume.storageSize, err = computePartitionSize(d.f, volume)
-		if err != nil {
-			return err
-		}
-	}
-
-	return createDmDevice(d.path, dmName, d.UUID(), volume, d.flags)
+	return volume.SetupMapper(dmName)
 }
 
 func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
@@ -133,19 +126,19 @@ func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
 			continue
 		}
 
-		err := d.Unlock(k, passphrase, dmName)
-		if err == nil {
-			return nil
-		} else if err == ErrPassphraseDoesNotMatch {
+		volume, err := d.UnsealVolume(k, passphrase)
+		if err == ErrPassphraseDoesNotMatch {
 			continue
-		} else {
+		} else if err != nil {
 			return err
 		}
+
+		return volume.SetupMapper(dmName)
 	}
 	return ErrPassphraseDoesNotMatch
 }
 
-func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInfo, error) {
+func (d *deviceV1) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, error) {
 	keyslots := d.hdr.KeySlots
 	if keyslotIdx < 0 || keyslotIdx >= len(keyslots) {
 		return nil, fmt.Errorf("keyslot %d is out of range of available slots", keyslotIdx)
@@ -174,18 +167,32 @@ func (d *deviceV1) decryptKeyslot(keyslotIdx int, passphrase []byte) (*volumeInf
 	}
 
 	encryption := fixedArrayToString(d.hdr.CipherName[:]) + "-" + fixedArrayToString(d.hdr.CipherMode[:])
-	info := &volumeInfo{
+
+	storageOffset := uint64(d.hdr.PayloadOffset) * storageSectorSize
+
+	storageSize, err := fileSize(d.f)
+	if err != nil {
+		return nil, err
+	}
+	if storageSize < storageOffset {
+		return nil, fmt.Errorf("backing file size %d is smaller than LUKS segment offset %d", storageSize, storageOffset)
+	}
+	storageSize -= storageOffset
+
+	v := Volume{
+		backingDevice:     d.path,
+		flags:             d.flags,
+		uuid:              d.UUID(),
 		key:               finalKey,
-		digestID:          0,
 		luksType:          "LUKS1",
-		storageSize:       0, // dynamic size
-		storageOffset:     uint64(d.hdr.PayloadOffset) * storageSectorSize,
+		storageSize:       storageSize,
+		storageOffset:     storageOffset,
 		storageEncryption: encryption,
 		storageIvTweak:    0,
 		storageSectorSize: storageSectorSize,
 	}
 
-	return info, nil
+	return &v, nil
 }
 
 func (d *deviceV1) decryptLuks1VolumeKey(keyslotIdx int, slot keySlot, afKey []byte, h func() hash.Hash) ([]byte, error) {

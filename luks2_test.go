@@ -52,8 +52,10 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 	assert.NoError(t, err)
 	assert.Equal(t, uuid, d.UUID())
 
-	_, err = d.decryptKeyslot(keySlot, []byte(password))
+	v, err := d.UnsealVolume(keySlot, []byte(password))
 	assert.NoError(t, err)
+	headerSize := 16777216
+	assert.Equal(t, uint64(24*1024*1024-headerSize), v.storageSize)
 }
 
 func TestLuks2UnlockBasic(t *testing.T) {
@@ -105,10 +107,10 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	d, err := initV2Device(disk.Name(), disk)
 	assert.NoError(t, err)
 
-	_, err = d.decryptKeyslot(0, []byte(password))
+	_, err = d.UnsealVolume(0, []byte(password))
 	assert.NoError(t, err)
 
-	_, err = d.decryptKeyslot(1, []byte(password2))
+	_, err = d.UnsealVolume(1, []byte(password2))
 	assert.NoError(t, err)
 }
 
@@ -153,6 +155,6 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uuid, d.UUID())
 
-	_, err = d.decryptKeyslot(0, []byte(password))
+	_, err = d.UnsealVolume(0, []byte(password))
 	assert.NoError(t, err)
 }

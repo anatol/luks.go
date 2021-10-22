@@ -33,7 +33,18 @@ type Device interface {
 	// FlagsClear clears flags
 	// Note that this method does not update LUKS v2 persistent flags
 	FlagsClear()
+
+	// UnsealVolume recovers slot password and then populates Volume structure that contains information needed to
+	// create a mapper device
+	UnsealVolume(keyslot int, passphrase []byte) (*Volume, error)
+
+	// Unlock is a shortcut for
+	// ```go
+	//   volume, err := dev.UnsealVolume(keyslot, passphrase)
+	//   volume.SetupMapper(dmName)
+	// ```
 	Unlock(keyslot int, passphrase []byte, dmName string) error
+	// UnlockAny iterates over all available slots and tries to unlock them until succeeds
 	UnlockAny(passphrase []byte, dmName string) error
 }
 

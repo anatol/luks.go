@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"os"
+	"syscall"
 
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/blake2s"
@@ -16,34 +17,29 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type volumeInfo struct {
-	key               []byte
-	digestID          int // id of the digest that matches the key
-	luksType          string
-	storageEncryption string
-	storageIvTweak    uint64
-	storageSectorSize uint64
-	storageOffset     uint64 // offset of underlying storage in bytes
-	storageSize       uint64 // length of underlying device in bytes, zero means that size should be calculated using `diskSize` function
-}
-
 // default sector size
 const storageSectorSize = 512
 
 // default number of anti-forensic stripes
 const stripesNum = 4000
 
-// computePartitionSize dynamically calculates the size of storage in sector size
-func computePartitionSize(f *os.File, volumeKey *volumeInfo) (uint64, error) {
-	size, err := unix.IoctlGetInt(int(f.Fd()), unix.BLKGETSIZE64)
+// fileSize returns size of the file. This function works both with regular files and block devices
+func fileSize(f *os.File) (uint64, error) {
+	st, err := f.Stat()
 	if err != nil {
 		return 0, err
 	}
 
-	if uint64(size) < volumeKey.storageOffset {
-		return 0, fmt.Errorf("Block file size %v is smaller than LUKS segment offset %v", size, volumeKey.storageOffset)
+	sys, ok := st.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, fmt.Errorf("unable to get stat for file %s", f.Name())
 	}
-	return uint64(size) - volumeKey.storageOffset, nil
+	if sys.Mode&syscall.S_IFBLK == 0 {
+		return uint64(sys.Size), nil
+	}
+
+	sz, err := unix.IoctlGetInt(int(f.Fd()), unix.BLKGETSIZE64)
+	return uint64(sz), err
 }
 
 func isPowerOfTwo(x uint) bool {
