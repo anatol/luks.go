@@ -1,9 +1,7 @@
 package luks
 
 import (
-	"encoding/hex"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/anatol/devmapper.go"
@@ -34,13 +32,6 @@ func (v *Volume) SetupMapper(name string) error {
 		kernelFlags = append(kernelFlags, flag)
 	}
 
-	if v.storageSectorSize == 0 {
-		return fmt.Errorf("invalid sector size")
-	}
-	if v.storageSectorSize != devmapper.SectorSize {
-		kernelFlags = append(kernelFlags, "sector_size:"+strconv.Itoa(int(v.storageSectorSize)))
-	}
-
 	if v.storageSize%v.storageSectorSize != 0 {
 		return fmt.Errorf("storage size must be multiple of sector size")
 	}
@@ -48,20 +39,16 @@ func (v *Volume) SetupMapper(name string) error {
 		return fmt.Errorf("offset must be multiple of sector size")
 	}
 
-	// the key should have hex format
-	key := make([]byte, hex.EncodedLen(len(v.key)))
-	hex.Encode(key, v.key)
-	defer clearSlice(key)
-
 	table := devmapper.CryptTable{
-		StartSector:   0,
-		Length:        v.storageSize / devmapper.SectorSize,
+		Start:         0,
+		Length:        v.storageSize,
 		BackendDevice: v.backingDevice,
-		BackendOffset: v.storageOffset / devmapper.SectorSize,
+		BackendOffset: v.storageOffset,
 		Encryption:    v.storageEncryption,
-		Key:           string(key),
+		Key:           v.key,
 		IVTweak:       v.storageIvTweak,
 		Flags:         kernelFlags,
+		SectorSize:    v.storageSectorSize,
 	}
 
 	uuid := fmt.Sprintf("CRYPT-%v-%v-%v", v.luksType, strings.ReplaceAll(v.uuid, "-", ""), name) // See dm_prepare_uuid()
