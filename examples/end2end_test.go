@@ -99,7 +99,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	assert.NoError(t, closeCmd.Run())
 
 	_, err = os.Stat(mapperFile)
-	assert.False(t, err == nil || !os.IsNotExist(err), "It is expected file /dev/mapper/%v does not exist", name)
+	assert.True(t, os.IsNotExist(err), "/dev/mapper/%v: file exists", name)
 
 	dev, err := luks.Open(loopDev.Path())
 	assert.NoError(t, err)
