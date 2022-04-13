@@ -4,12 +4,12 @@ go 1.17
 
 require (
 	github.com/anatol/devmapper.go v0.0.0-20211210164347-f67e20c4e7f7
-	github.com/anatol/vmtest v0.0.0-20211004221854-3a36b6b86cc0
-	github.com/stretchr/testify v1.7.0
+	github.com/anatol/vmtest v0.0.0-20211215032353-afd7b1dd38ef
+	github.com/stretchr/testify v1.7.1
 	github.com/tmc/scp v0.0.0-20170824174625-f7b48647feef
 	github.com/tych0/go-losetup v0.0.0-20170407175016-fc9adea44124
-	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b
-	golang.org/x/sys v0.0.0-20211210111614-af8b64212486
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 )
 
 require (
