@@ -112,7 +112,11 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	}
 
 	// open the crypt device again, this time with our Golang API
-	assert.NoError(t, dev.Unlock(0, []byte(password), name))
+	// UnsealVolume+SetupMapper is equivalent of `cryptsetup open /dev/sda1 volumename`
+	volume, err := dev.UnsealVolume( /* slot */ 0, []byte(password))
+	assert.NoError(t, err)
+	err = volume.SetupMapper(name)
+	assert.NoError(t, err)
 	defer luks.Lock(name)
 
 	out, err := exec.Command("cryptsetup", "status", name).CombinedOutput()
