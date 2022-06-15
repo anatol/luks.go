@@ -10,7 +10,7 @@ import (
 // Volume represents information provided by an unsealed (i.e. with recovered password) LUKS slot
 type Volume struct {
 	backingDevice     string
-	flags             []string // dmmapper flags
+	flags             []string // luks-named flags
 	uuid              string
 	key               []byte
 	luksType          string
@@ -19,6 +19,15 @@ type Volume struct {
 	storageSectorSize uint64
 	storageOffset     uint64 // offset of underlying storage in bytes
 	storageSize       uint64 // length of underlying device in bytes, zero means that size should be calculated using `diskSize` function
+}
+
+// map of LUKS flag names to its dm-crypt counterparts
+var flagsKernelNames = map[string]string{
+	FlagAllowDiscards:       "allow_discards",
+	FlagSameCPUCrypt:        "same_cpu_crypt",
+	FlagSubmitFromCryptCPUs: "submit_from_crypt_cpus",
+	FlagNoReadWorkqueue:     "no_read_workqueue",
+	FlagNoWriteWorkqueue:    "no_write_workqueue",
 }
 
 // SetupMapper creates a device mapper for the given LUKS volume

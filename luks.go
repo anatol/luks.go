@@ -58,15 +58,6 @@ const (
 	FlagNoWriteWorkqueue    string = "no-write-workqueue"
 )
 
-// map of LUKS flag names to its dm-crypt counterparts
-var flagsKernelNames = map[string]string{
-	FlagAllowDiscards:       "allow_discards",
-	FlagSameCPUCrypt:        "same_cpu_crypt",
-	FlagSubmitFromCryptCPUs: "submit_from_crypt_cpus",
-	FlagNoReadWorkqueue:     "no_read_workqueue",
-	FlagNoWriteWorkqueue:    "no_write_workqueue",
-}
-
 // Token represents LUKS token metadata information
 type Token struct {
 	ID    int

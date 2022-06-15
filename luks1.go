@@ -93,11 +93,6 @@ func (d *deviceV1) FlagsGet() []string {
 }
 
 func (d *deviceV1) FlagsAdd(flags ...string) error {
-	for _, f := range flags {
-		if _, ok := flagsKernelNames[f]; !ok {
-			return fmt.Errorf("Unknown LUKS flag: %v", f)
-		}
-	}
 	d.flags = append(d.flags, flags...)
 	return nil
 }
