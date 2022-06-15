@@ -14,7 +14,7 @@ if err != nil {
 defer dev.Close()
 
 // set LUKS flags before unlocking the volume
-if err := dev.FlagsAdd(luks.FlagNoReadWorkqueue, luks.FlagNoWriteWorkqueue); err != nil {
+if err := dev.FlagsAdd(luks.FlagAllowDiscards); err != nil {
     log.Print(err)
 }
 

@@ -54,8 +54,8 @@ const (
 	FlagAllowDiscards       string = "allow-discards"
 	FlagSameCPUCrypt        string = "same-cpu-crypt"
 	FlagSubmitFromCryptCPUs string = "submit-from-crypt-cpus"
-	FlagNoReadWorkqueue     string = "no-read-workqueue"
-	FlagNoWriteWorkqueue    string = "no-write-workqueue"
+	FlagNoReadWorkqueue     string = "no-read-workqueue"  // supported at Linux 5.9 or newer
+	FlagNoWriteWorkqueue    string = "no-write-workqueue" // supported at Linux 5.9 or newer
 )
 
 // Token represents LUKS token metadata information
