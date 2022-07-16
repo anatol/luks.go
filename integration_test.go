@@ -99,7 +99,7 @@ func withRoot(t *testing.T) {
 
 func TestIntegration(t *testing.T) {
 	assert.NoError(t, compileExamples())
-	//defer os.Remove("luks_end2end_test")
+	// defer os.Remove("luks_end2end_test")
 
 	t.Run("Qemu", withQemu)
 	t.Run("Root", withRoot)

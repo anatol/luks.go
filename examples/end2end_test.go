@@ -85,7 +85,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	}
 
 	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
-	require.NoError(t, ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0666))
+	require.NoError(t, ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0o666))
 	require.NoError(t, syscall.Unmount(tmpMountpoint, 0))
 	require.NoError(t, os.RemoveAll(tmpMountpoint))
 
