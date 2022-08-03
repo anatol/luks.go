@@ -22,7 +22,7 @@ func runAntiforensicTest(t *testing.T, hash hash.Hash) {
 
 	dest, err := afSplit(secret, stripes, hash)
 	assert.NoError(t, err)
-	assert.Equal(t, 64*4000, len(dest))
+	assert.Len(t, dest, 64*4000)
 
 	final, err := afMerge(dest, keySize, stripes, hash)
 	assert.NoError(t, err)
