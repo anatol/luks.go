@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsPowerOf2(t *testing.T) {
@@ -13,23 +13,23 @@ func TestIsPowerOf2(t *testing.T) {
 	invalid := []uint{3, 5, 9, 323, 34322, 6521212322}
 
 	for _, v := range valid {
-		assert.True(t, isPowerOfTwo(v))
+		require.True(t, isPowerOfTwo(v))
 	}
 
 	for _, v := range invalid {
-		assert.False(t, isPowerOfTwo(v))
+		require.False(t, isPowerOfTwo(v))
 	}
 }
 
 func TestRundup(t *testing.T) {
-	assert.Equal(t, 0, roundUp(0, 8))
-	assert.Equal(t, 8, roundUp(1, 8))
+	require.Equal(t, 0, roundUp(0, 8))
+	require.Equal(t, 8, roundUp(1, 8))
 }
 
 func TestFromNulEndedSlice(t *testing.T) {
 	check := func(input []byte, expected string) {
 		str := fixedArrayToString(input)
-		assert.Equal(t, expected, str)
+		require.Equal(t, expected, str)
 	}
 
 	check([]byte{}, "")

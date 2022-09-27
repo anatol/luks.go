@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func prepareLuks2Disk(password string, cryptsetupArgs ...string) (*os.File, error) {
@@ -40,21 +40,21 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 
 	password := "foobar"
 	disk, err := prepareLuks2Disk(password, cryptsetupArgs...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
 	d, err := initV2Device(disk.Name(), disk)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, uuid, d.UUID())
+	require.NoError(t, err)
+	require.Equal(t, uuid, d.UUID())
 
 	v, err := d.UnsealVolume(keySlot, []byte(password))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	headerSize := 16777216
-	assert.Equal(t, uint64(24*1024*1024-headerSize), v.storageSize)
+	require.Equal(t, uint64(24*1024*1024-headerSize), v.storageSize)
 }
 
 func TestLuks2UnlockBasic(t *testing.T) {
@@ -84,12 +84,16 @@ func TestLuks2Hashes(t *testing.T) {
 	}
 }
 
+func TestLuks2CamelliaBlockCipher(t *testing.T) {
+	runLuks2Test(t, 0, "--cipher", "camellia-xts-plain64", "--key-size", "512", "--hash", "sha512", "--iter-time", "800", "--pbkdf", "argon2id", "--pbkdf-memory", "41000")
+}
+
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	t.Parallel()
 
 	password := "barfoo"
 	disk, err := prepareLuks2Disk(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -101,16 +105,16 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 		addKeyCmd.Stdout = os.Stdout
 		addKeyCmd.Stderr = os.Stderr
 	}
-	assert.NoError(t, addKeyCmd.Run())
+	require.NoError(t, addKeyCmd.Run())
 
 	d, err := initV2Device(disk.Name(), disk)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = d.UnsealVolume(0, []byte(password))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = d.UnsealVolume(1, []byte(password2))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLuks2UnlockWithToken(t *testing.T) {
@@ -118,7 +122,7 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 
 	password := "foobar"
 	disk, err := prepareLuks2Disk(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
@@ -130,30 +134,30 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 		addTokenCmd.Stdout = os.Stdout
 		addTokenCmd.Stderr = os.Stderr
 	}
-	assert.NoError(t, addTokenCmd.Run())
+	require.NoError(t, addTokenCmd.Run())
 
 	d, err := initV2Device(disk.Name(), disk)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	slots := d.Slots()
-	assert.Len(t, slots, 1)
-	assert.Equal(t, 0, slots[0])
+	require.Len(t, slots, 1)
+	require.Equal(t, 0, slots[0])
 
 	tokens, err := d.Tokens()
-	assert.NoError(t, err)
-	assert.Len(t, tokens, 1)
+	require.NoError(t, err)
+	require.Len(t, tokens, 1)
 
 	tk := tokens[0]
-	assert.Equal(t, "clevis", tk.Type)
-	assert.Equal(t, []int{0}, tk.Slots)
+	require.Equal(t, "clevis", tk.Type)
+	require.Equal(t, []int{0}, tk.Slots)
 
 	expected := `{"type":"clevis","keyslots":["0"],"jwe":{"ciphertext":"","encrypted_key":"","iv":"","protected":"test\n","tag":""}}`
-	assert.Equal(t, expected, string(tk.Payload))
+	require.Equal(t, expected, string(tk.Payload))
 
 	uuid, err := blkidUUID(disk.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, uuid, d.UUID())
+	require.NoError(t, err)
+	require.Equal(t, uuid, d.UUID())
 
 	_, err = d.UnsealVolume(0, []byte(password))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

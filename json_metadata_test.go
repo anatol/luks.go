@@ -5,16 +5,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parseMetadata(t *testing.T, filename string) {
 	data, err := os.ReadFile(filename)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var meta metadata
-	assert.NoError(t, json.Unmarshal(data, &meta))
-	assert.Equal(t, uint(4000), meta.Keyslots[0].Af.Stripes)
+	require.NoError(t, json.Unmarshal(data, &meta))
+	require.Equal(t, uint(4000), meta.Keyslots[0].Af.Stripes)
 }
 
 func TestParseMetadata(t *testing.T) {
