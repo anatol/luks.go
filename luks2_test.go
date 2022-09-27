@@ -2,7 +2,6 @@ package luks
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,7 +11,7 @@ import (
 )
 
 func prepareLuks2Disk(password string, cryptsetupArgs ...string) (*os.File, error) {
-	disk, err := ioutil.TempFile("", "luksv2.go.disk")
+	disk, err := os.CreateTemp("", "luksv2.go.disk")
 	if err != nil {
 		return nil, err
 	}

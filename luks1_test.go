@@ -1,7 +1,6 @@
 package luks
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,7 +10,7 @@ import (
 )
 
 func prepareLuks1Disk(t *testing.T, password string, cryptsetupArgs ...string) (*os.File, error) {
-	disk, err := ioutil.TempFile("", "luksv1.go.disk")
+	disk, err := os.CreateTemp("", "luksv1.go.disk")
 	assert.NoError(t, err)
 	assert.NoError(t, disk.Truncate(2*1024*1024))
 

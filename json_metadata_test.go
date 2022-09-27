@@ -2,14 +2,14 @@ package luks
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func parseMetadata(t *testing.T, filename string) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
 	var meta metadata

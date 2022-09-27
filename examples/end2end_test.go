@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +21,7 @@ import (
 func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs ...string) {
 	t.Parallel()
 
-	tmpImage, err := ioutil.TempFile("", "luks.go.img."+name)
+	tmpImage, err := os.CreateTemp("", "luks.go.img."+name)
 	require.NoError(t, err)
 	defer tmpImage.Close()
 	defer os.Remove(tmpImage.Name())
@@ -78,14 +77,14 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	require.NoError(t, formatExt4Cmd.Run())
 
 	// try to mount it to ext4 filesystem
-	tmpMountpoint, err := ioutil.TempDir("", "luks.go.mount."+name)
+	tmpMountpoint, err := os.MkdirTemp("", "luks.go.mount."+name)
 	require.NoError(t, err)
 	if err := syscall.Mount(mapperFile, tmpMountpoint, "ext4", 0, ""); err != nil {
 		require.Error(t, os.NewSyscallError("mount", err))
 	}
 
 	emptyFile := filepath.Join(tmpMountpoint, "empty.txt")
-	require.NoError(t, ioutil.WriteFile(emptyFile, []byte("Hello, world!"), 0o666))
+	require.NoError(t, os.WriteFile(emptyFile, []byte("Hello, world!"), 0o666))
 	require.NoError(t, syscall.Unmount(tmpMountpoint, 0))
 	require.NoError(t, os.RemoveAll(tmpMountpoint))
 
@@ -134,7 +133,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	time.Sleep(200 * time.Millisecond)
 
 	// try to mount it to ext4 filesystem
-	tmpMountpoint2, err := ioutil.TempDir("", "luks.go.mount."+name)
+	tmpMountpoint2, err := os.MkdirTemp("", "luks.go.mount."+name)
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpMountpoint2)
 
@@ -143,7 +142,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 	}
 	defer syscall.Unmount(tmpMountpoint2, 0)
 
-	data, err := ioutil.ReadFile(filepath.Join(tmpMountpoint2, "empty.txt"))
+	data, err := os.ReadFile(filepath.Join(tmpMountpoint2, "empty.txt"))
 	require.NoError(t, err)
 	require.Equal(t, "Hello, world!", string(data))
 
@@ -158,7 +157,7 @@ func runLuksTest(t *testing.T, name string, testPersistentFlags bool, formatArgs
 		udevFile := fmt.Sprintf("/run/udev/data/b%d:%d", major, minor)
 
 		fmt.Printf(">>> %s\n", udevFile)
-		content, err := ioutil.ReadFile(udevFile)
+		content, err := os.ReadFile(udevFile)
 		require.NoError(t, err)
 		fmt.Print(string(content))
 	}
