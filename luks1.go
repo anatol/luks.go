@@ -2,7 +2,6 @@ package luks
 
 import (
 	"bytes"
-	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
 	"fmt"
@@ -224,11 +223,9 @@ func (d *deviceV1) buildLuks1AfCipher(afKey []byte) (*xts.Cipher, error) {
 	var cipherFunc func(key []byte) (cipher.Block, error)
 
 	cipherName := fixedArrayToString(d.hdr.CipherName[:])
-	switch cipherName {
-	case "aes":
-		cipherFunc = aes.NewCipher
-	default:
-		return nil, fmt.Errorf("Unknown cipher: %v", cipherName)
+	cipherFunc, err := getCipher(cipherName)
+	if err != nil {
+		return nil, err
 	}
 
 	cipherMode := fixedArrayToString(d.hdr.CipherMode[:])

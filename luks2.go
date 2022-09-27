@@ -2,8 +2,6 @@ package luks
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -391,12 +389,9 @@ func buildLuks2AfCipher(encryption string, afKey []byte) (*xts.Cipher, error) {
 	cipherMode := encParts[1]
 	// ivModeName := encParts[2]
 
-	var cipherFunc func(key []byte) (cipher.Block, error)
-	switch cipherName {
-	case "aes":
-		cipherFunc = aes.NewCipher
-	default:
-		return nil, fmt.Errorf("Unknown cipher: %v", cipherName)
+	cipherFunc, err := getCipher(cipherName)
+	if err != nil {
+		return nil, err
 	}
 
 	switch cipherMode {

@@ -2,6 +2,8 @@ package luks
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -10,6 +12,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/dgryski/go-camellia"
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/ripemd160"
@@ -104,6 +107,17 @@ func getHashAlgo(name string) (func() hash.Hash, int) {
 		return blake2s256Constructor()
 	default:
 		return nil, 0
+	}
+}
+
+func getCipher(name string) (func(key []byte) (cipher.Block, error), error) {
+	switch name {
+	case "aes":
+		return aes.NewCipher, nil
+	case "camellia":
+		return camellia.New, nil
+	default:
+		return nil, fmt.Errorf("Unknown cipher: %v", name)
 	}
 }
 
