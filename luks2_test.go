@@ -54,7 +54,7 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 	v, err := d.UnsealVolume(keySlot, []byte(password))
 	require.NoError(t, err)
 	headerSize := 16777216
-	require.Equal(t, uint64(24*1024*1024-headerSize), v.storageSize)
+	require.Equal(t, uint64(24*1024*1024-headerSize), v.StorageSize)
 }
 
 func TestLuks2UnlockBasic(t *testing.T) {

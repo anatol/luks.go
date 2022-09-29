@@ -9,16 +9,16 @@ import (
 
 // Volume represents information provided by an unsealed (i.e. with recovered password) LUKS slot
 type Volume struct {
-	backingDevice     string
-	flags             []string // luks-named flags
-	uuid              string
-	key               []byte
-	luksType          string
-	storageEncryption string
-	storageIvTweak    uint64
-	storageSectorSize uint64
-	storageOffset     uint64 // offset of underlying storage in bytes
-	storageSize       uint64 // length of underlying device in bytes, zero means that size should be calculated using `diskSize` function
+	BackingDevice     string
+	Flags             []string // luks-named flags
+	UUID              string
+	key               []byte // keep decoded key field private for security reasons
+	LuksType          string
+	StorageEncryption string
+	StorageIvTweak    uint64
+	StorageSectorSize uint64
+	StorageOffset     uint64 // offset of underlying storage in bytes
+	StorageSize       uint64 // length of underlying device in bytes, zero means that size should be calculated using `diskSize` function
 }
 
 // map of LUKS flag names to its dm-crypt counterparts
@@ -32,8 +32,8 @@ var flagsKernelNames = map[string]string{
 
 // SetupMapper creates a device mapper for the given LUKS volume
 func (v *Volume) SetupMapper(name string) error {
-	kernelFlags := make([]string, 0, len(v.flags))
-	for _, f := range v.flags {
+	kernelFlags := make([]string, 0, len(v.Flags))
+	for _, f := range v.Flags {
 		flag, ok := flagsKernelNames[f]
 		if !ok {
 			return fmt.Errorf("unknown LUKS flag: %v", f)
@@ -41,26 +41,26 @@ func (v *Volume) SetupMapper(name string) error {
 		kernelFlags = append(kernelFlags, flag)
 	}
 
-	if v.storageSize%v.storageSectorSize != 0 {
+	if v.StorageSize%v.StorageSectorSize != 0 {
 		return fmt.Errorf("storage size must be multiple of sector size")
 	}
-	if v.storageOffset%v.storageSectorSize != 0 {
+	if v.StorageOffset%v.StorageSectorSize != 0 {
 		return fmt.Errorf("offset must be multiple of sector size")
 	}
 
 	table := devmapper.CryptTable{
 		Start:         0,
-		Length:        v.storageSize,
-		BackendDevice: v.backingDevice,
-		BackendOffset: v.storageOffset,
-		Encryption:    v.storageEncryption,
+		Length:        v.StorageSize,
+		BackendDevice: v.BackingDevice,
+		BackendOffset: v.StorageOffset,
+		Encryption:    v.StorageEncryption,
 		Key:           v.key,
-		IVTweak:       v.storageIvTweak,
+		IVTweak:       v.StorageIvTweak,
 		Flags:         kernelFlags,
-		SectorSize:    v.storageSectorSize,
+		SectorSize:    v.StorageSectorSize,
 	}
 
-	uuid := fmt.Sprintf("CRYPT-%v-%v-%v", v.luksType, strings.ReplaceAll(v.uuid, "-", ""), name) // See dm_prepare_uuid()
+	uuid := fmt.Sprintf("CRYPT-%v-%v-%v", v.LuksType, strings.ReplaceAll(v.UUID, "-", ""), name) // See dm_prepare_uuid()
 
 	return devmapper.CreateAndLoad(name, uuid, 0, table)
 }

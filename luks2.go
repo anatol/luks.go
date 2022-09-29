@@ -291,16 +291,16 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 	}
 
 	v := &Volume{
-		backingDevice:     d.path,
-		flags:             d.flags,
-		uuid:              d.UUID(),
+		BackingDevice:     d.path,
+		Flags:             d.flags,
+		UUID:              d.UUID(),
 		key:               finalKey,
-		luksType:          "LUKS2",
-		storageSize:       storageSize,
-		storageOffset:     uint64(offset),
-		storageEncryption: storageSegment.Encryption,
-		storageIvTweak:    uint64(ivTweak),
-		storageSectorSize: uint64(storageSegment.SectorSize),
+		LuksType:          "LUKS2",
+		StorageSize:       storageSize,
+		StorageOffset:     uint64(offset),
+		StorageEncryption: storageSegment.Encryption,
+		StorageIvTweak:    uint64(ivTweak),
+		StorageSectorSize: uint64(storageSegment.SectorSize),
 	}
 	return v, nil
 }
