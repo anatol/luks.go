@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
+	"golang.org/x/crypto/twofish"
 	"golang.org/x/sys/unix"
 )
 
@@ -116,6 +117,12 @@ func getCipher(name string) (func(key []byte) (cipher.Block, error), error) {
 		return aes.NewCipher, nil
 	case "camellia":
 		return camellia.New, nil
+	case "twofish":
+		f := func(key []byte) (cipher.Block, error) {
+			// twofish.NewCipher returns Cipher type, convert it to cipher.Block
+			return twofish.NewCipher(key)
+		}
+		return f, nil
 	default:
 		return nil, fmt.Errorf("Unknown cipher: %v", name)
 	}

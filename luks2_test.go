@@ -88,6 +88,10 @@ func TestLuks2CamelliaBlockCipher(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "camellia-xts-plain64", "--key-size", "512", "--hash", "sha512", "--iter-time", "800", "--pbkdf", "argon2id", "--pbkdf-memory", "41000")
 }
 
+func TestLuks2TwofishBlockCipher(t *testing.T) {
+	runLuks2Test(t, 0, "--cipher", "twofish-xts-plain64")
+}
+
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	t.Parallel()
 
