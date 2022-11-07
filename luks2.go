@@ -117,9 +117,9 @@ func (d *deviceV2) Path() string {
 func (d *deviceV2) Slots() []int {
 	var normPrio, highPrio []int
 	for i, k := range d.meta.Keyslots {
-		if k.Priority == "2" {
+		if k.Priority != nil && *k.Priority == 2 {
 			highPrio = append(highPrio, i)
-		} else {
+		} else if k.Priority == nil || *k.Priority == 1 {
 			normPrio = append(normPrio, i)
 		}
 	}
