@@ -8,7 +8,7 @@ type keyslot struct {
 	Af       antiForensic `json:"af"`
 	Area     area         `json:"area"`
 	Kdf      kdf          `json:"kdf"`
-	Priority string       `json:"priority"` // it is actually a number, but we need to distinguish '0' (ignore), from absence of the field (normal priority)
+	Priority *int         `json:"priority"` // need to distinguish 0 (ignore) from absence of the field (normal priority)
 }
 
 type antiForensic struct {

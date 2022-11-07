@@ -165,3 +165,33 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 	_, err = d.UnsealVolume(0, []byte(password))
 	require.NoError(t, err)
 }
+
+func TestLuks2PreferedPriority(t *testing.T) {
+	t.Parallel()
+
+	password := "foobar"
+	disk, err := prepareLuks2Disk(password)
+	require.NoError(t, err)
+	defer disk.Close()
+	defer os.Remove(disk.Name())
+
+	// now let's increase the priority of the keyslot
+	configCmd := exec.Command("cryptsetup", "config", "--priority", "prefer", "--key-slot", "0", disk.Name())
+	if testing.Verbose() {
+		configCmd.Stdout = os.Stdout
+		configCmd.Stderr = os.Stderr
+	}
+	require.NoError(t, configCmd.Run())
+
+	d, err := initV2Device(disk.Name(), disk)
+	require.NoError(t, err)
+
+	uuid, err := blkidUUID(disk.Name())
+	require.NoError(t, err)
+	require.Equal(t, uuid, d.UUID())
+
+	_, err = d.UnsealVolume(0, []byte(password))
+	require.NoError(t, err)
+
+	require.ElementsMatch(t, []int{0}, d.Slots())
+}
