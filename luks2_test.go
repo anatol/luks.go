@@ -69,8 +69,12 @@ func TestLuks2UnlockNonZeroSlotId(t *testing.T) {
 	runLuks2Test(t, 4, "--key-slot", "4")
 }
 
-func TestLuks2UnlockComplex(t *testing.T) {
+func TestLuks2UnlockManyParams(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--key-size", "512", "--iter-time", "2000", "--pbkdf", "argon2id", "--hash", "sha3-512")
+}
+
+func TestLuks2UnlockKeysize256(t *testing.T) {
+	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--key-size", "256", "--pbkdf", "argon2id", "--iter-time", "7", "--pbkdf-memory", "1048576", "--hash", "sha256")
 }
 
 func TestLuks2Hashes(t *testing.T) {
