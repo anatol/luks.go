@@ -216,7 +216,7 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 		return nil, fmt.Errorf("Unable to get a keyslot with id: %d", keyslotIdx)
 	}
 
-	afKey, err := deriveLuks2AfKey(keyslot.Kdf, keyslotIdx, passphrase, keyslot.KeySize)
+	afKey, err := deriveLuks2AfKey(keyslot.Kdf, keyslotIdx, passphrase, keyslot.Area.KeySize)
 	if err != nil {
 		return nil, err
 	}
@@ -324,11 +324,11 @@ func computeDigestForKey(dig *digest, keyslotIdx int, finalKey []byte) ([]byte, 
 }
 
 func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey []byte) ([]byte, error) {
-	// parse encryption mode for the keyslot area, see crypt_parse_name_and_mode()
+	// this method follows logic at luks2_keyslot_get_key()
 	area := keyslot.Area
 
 	// decrypt keyslotIdx area using the derived key
-	keyslotSize := area.KeySize * stripesNum
+	keyslotSize := keyslot.KeySize * stripesNum
 
 	areaSize, err := area.Size.Int64()
 	if err != nil {
@@ -380,6 +380,7 @@ func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey 
 }
 
 func buildLuks2AfCipher(encryption string, afKey []byte) (*xts.Cipher, error) {
+	// parse encryption mode for the keyslot area, see crypt_parse_name_and_mode()
 	// example of `encryption` value is 'aes-xts-plain64'
 	encParts := strings.Split(encryption, "-")
 	if len(encParts) != 3 {

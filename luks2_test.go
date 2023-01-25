@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 	"testing"
 
@@ -94,6 +95,17 @@ func TestLuks2CamelliaBlockCipher(t *testing.T) {
 
 func TestLuks2TwofishBlockCipher(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "twofish-xts-plain64")
+}
+
+func TestLuks2WithIntegrity(t *testing.T) {
+	// dm-integrity requires 'root'
+	curr, err := user.Current()
+	require.NoError(t, err)
+	if curr.Username != "root" {
+		t.Skip("the test requires root permissions, run it with sudo")
+	}
+
+	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--integrity", "hmac-sha256", "--integrity-no-wipe", "--sector-size", "4096")
 }
 
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
