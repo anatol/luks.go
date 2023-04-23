@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/dgryski/go-camellia"
+	"github.com/jzelinskie/whirlpool"
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/ripemd160"
@@ -71,7 +72,7 @@ func clearSlice(slice []byte) {
 // getHashAlgo gets hash implementation and the hash size by its name
 // If hash is not found then it returns nil as a first argument
 func getHashAlgo(name string) (func() hash.Hash, int) {
-	// Note that cryptsetup support a few more hash algorithms not implemented here: whirlpool, stribog256, stribog512, sm3
+	// Note that cryptsetup support a few more hash algorithms not implemented here: stribog256, stribog512, sm3
 	// golang lib does not implement those
 	// TODO use third-party implementations for other hashes and add its support to luks.go
 	switch name {
@@ -106,6 +107,8 @@ func getHashAlgo(name string) (func() hash.Hash, int) {
 	case "blake2s-256":
 		// blake2s-{128,160,224} are not supported by golang crypto library
 		return blake2s256Constructor()
+	case "whirlpool":
+		return whirlpool.New, 512 / 8
 	default:
 		return nil, 0
 	}
