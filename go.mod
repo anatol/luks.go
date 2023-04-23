@@ -6,11 +6,11 @@ require (
 	github.com/anatol/devmapper.go v0.0.0-20220907161421-ba4de5fc0fd1
 	github.com/anatol/vmtest v0.0.0-20220413190228-7a42f1f6d7b8
 	github.com/dgryski/go-camellia v0.0.0-20191119043421-69a8a13fb23d
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/tmc/scp v0.0.0-20170824174625-f7b48647feef
 	github.com/tych0/go-losetup v0.0.0-20170407175016-fc9adea44124
-	golang.org/x/crypto v0.1.0
-	golang.org/x/sys v0.2.0
+	golang.org/x/crypto v0.8.0
+	golang.org/x/sys v0.7.0
 )
 
 require (
