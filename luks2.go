@@ -243,7 +243,7 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 	if err != nil {
 		return nil, fmt.Errorf("keyslotIdx[%v].digest.Digest base64 parsing failed: %v", keyslotIdx, err)
 	}
-	if !bytes.Equal(generatedDigest, expectedDigest) {
+	if !bytes.Equal(generatedDigest[0:len(expectedDigest)], expectedDigest) {
 		return nil, ErrPassphraseDoesNotMatch
 	}
 	clearSlice(generatedDigest)
