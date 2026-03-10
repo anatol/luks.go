@@ -36,7 +36,7 @@ func runLuks1Test(t *testing.T, cryptsetupArgs ...string) {
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
-	d, err := initV1Device(disk.Name(), disk)
+	d, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	tokens, err := d.Tokens()
@@ -82,7 +82,7 @@ func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 	}
 	require.NoError(t, addKeyCmd.Run())
 
-	d, err := initV1Device(disk.Name(), disk)
+	d, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	tokens, err := d.Tokens()
@@ -94,6 +94,97 @@ func TestLuks1UnlockMultipleKeySlots(t *testing.T) {
 
 	_, err = d.UnsealVolume(1, []byte(password2))
 	require.NoError(t, err)
+}
+
+func TestLuks1DetachedHeader(t *testing.T) {
+	t.Parallel()
+
+	password := "foobar"
+
+	data, err := os.CreateTemp("", "luksv1.go.data")
+	require.NoError(t, err)
+	defer os.Remove(data.Name())
+	defer data.Close()
+	require.NoError(t, data.Truncate(2*1024*1024))
+
+	hdr, err := os.CreateTemp("", "luksv1.go.hdr")
+	require.NoError(t, err)
+	defer os.Remove(hdr.Name())
+	defer hdr.Close()
+	require.NoError(t, hdr.Truncate(2*1024*1024))
+
+	cmd := exec.Command("cryptsetup", "luksFormat", "--type", "luks1", "--iter-time", "5", "-q", "--header", hdr.Name(), data.Name())
+	cmd.Stdin = strings.NewReader(password)
+	if testing.Verbose() {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	require.NoError(t, cmd.Run())
+
+	d, err := OpenWithHeader(data.Name(), hdr.Name())
+	require.NoError(t, err)
+	defer d.Close()
+
+	_, err = d.UnsealVolume(0, []byte(password))
+	require.NoError(t, err)
+}
+
+func TestOpenWithHeaderMissingHeaderFile(t *testing.T) {
+	t.Parallel()
+
+	_, err := OpenWithHeader("/dev/null", "/nonexistent/header/path")
+	require.Error(t, err)
+}
+
+func TestOpenWithHeaderInvalidMagic(t *testing.T) {
+	t.Parallel()
+
+	hdr, err := os.CreateTemp("", "luks.go.badhdr")
+	require.NoError(t, err)
+	defer os.Remove(hdr.Name())
+	hdr.Close()
+
+	require.NoError(t, os.WriteFile(hdr.Name(), []byte("notluks!!"), 0600))
+
+	_, err = OpenWithHeader("/dev/null", hdr.Name())
+	require.ErrorContains(t, err, "invalid LUKS header")
+}
+
+func TestOpenWithHeaderMissingDataFile(t *testing.T) {
+	t.Parallel()
+
+	// Build a minimal fake header: LUKS magic + version 1 + zeroes
+	fakeHdr := make([]byte, 592) // headerV1 is 592 bytes
+	copy(fakeHdr, "LUKS\xba\xbe")
+	fakeHdr[6] = 0x00
+	fakeHdr[7] = 0x01
+
+	hdr, err := os.CreateTemp("", "luks.go.fakehdr")
+	require.NoError(t, err)
+	defer os.Remove(hdr.Name())
+	hdr.Close()
+
+	require.NoError(t, os.WriteFile(hdr.Name(), fakeHdr, 0600))
+
+	_, err = OpenWithHeader("/nonexistent/data/path", hdr.Name())
+	require.Error(t, err)
+}
+
+func TestOpenWithHeaderUnsupportedVersion(t *testing.T) {
+	t.Parallel()
+
+	// Valid magic, unsupported version 3
+	fakeHdr := []byte("LUKS\xba\xbe\x00\x03")
+
+	hdr, err := os.CreateTemp("", "luks.go.ver3hdr")
+	require.NoError(t, err)
+	defer os.Remove(hdr.Name())
+	hdr.Close()
+
+	require.NoError(t, os.WriteFile(hdr.Name(), fakeHdr, 0600))
+
+	_, err = OpenWithHeader("/dev/null", hdr.Name())
+	require.ErrorContains(t, err, "invalid LUKS version 3")
 }
 
 func TestReadLuksMetaInitialized(t *testing.T) {
@@ -131,7 +222,7 @@ func TestReadLuksMetaInitialized(t *testing.T) {
 	}
 	require.NoError(t, saveMeta2.Run())
 
-	d, err := initV1Device(disk.Name(), disk)
+	d, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	tokens, err := d.Tokens()

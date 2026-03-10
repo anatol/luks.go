@@ -37,7 +37,7 @@ func TestConvertV1toV2(t *testing.T) {
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
-	d, err := initV1Device(disk.Name(), disk)
+	d, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	tokens, err := d.Tokens()
@@ -55,7 +55,7 @@ func TestConvertV1toV2(t *testing.T) {
 	err = exec.Command("cryptsetup", "convert", "--type", "luks2", disk.Name()).Run()
 	require.NoError(t, err)
 
-	d2, err := initV2Device(disk.Name(), disk)
+	d2, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 	_, err = d2.UnsealVolume(0, []byte(password))
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestConvertV1toV2(t *testing.T) {
 	err = exec.Command("cryptsetup", "convert", "--type", "luks1", disk.Name()).Run()
 	require.NoError(t, err)
 
-	d3, err := initV1Device(disk.Name(), disk)
+	d3, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 	_, err = d3.UnsealVolume(0, []byte(password))
 	require.NoError(t, err)
@@ -80,7 +80,7 @@ func TestConvertV2toV1(t *testing.T) {
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
-	d, err := initV2Device(disk.Name(), disk)
+	d, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	tokens, err := d.Tokens()
@@ -101,7 +101,7 @@ func TestConvertV2toV1(t *testing.T) {
 	err = cmd.Run()
 	require.NoError(t, err)
 
-	d2, err := initV1Device(disk.Name(), disk)
+	d2, err := initV1Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 	_, err = d2.UnsealVolume(0, []byte(password))
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestConvertV2toV1(t *testing.T) {
 	err = exec.Command("cryptsetup", "convert", "--type", "luks2", disk.Name()).Run()
 	require.NoError(t, err)
 
-	d3, err := initV2Device(disk.Name(), disk)
+	d3, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 	_, err = d3.UnsealVolume(0, []byte(password))
 	require.NoError(t, err)

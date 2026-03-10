@@ -39,19 +39,20 @@ type headerV2 struct {
 
 type deviceV2 struct {
 	path  string
-	f     *os.File
+	hdrF  *os.File // header file: source of keyslot material
+	dataF *os.File // data device: used for storage size; equals hdrF when header is embedded
 	hdr   *headerV2
 	meta  *metadata
 	flags []string
 }
 
-func initV2Device(path string, f *os.File) (*deviceV2, error) {
+func initV2Device(path string, hdrF, dataF *os.File) (*deviceV2, error) {
 	var hdr headerV2
 
-	if _, err := f.Seek(0, 0); err != nil {
+	if _, err := hdrF.Seek(0, 0); err != nil {
 		return nil, err
 	}
-	if err := binary.Read(f, binary.BigEndian, &hdr); err != nil {
+	if err := binary.Read(hdrF, binary.BigEndian, &hdr); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +63,7 @@ func initV2Device(path string, f *os.File) (*deviceV2, error) {
 
 	// read the whole header
 	data := make([]byte, hdrSize)
-	if _, err := f.ReadAt(data, 0); err != nil {
+	if _, err := hdrF.ReadAt(data, 0); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +100,8 @@ func initV2Device(path string, f *os.File) (*deviceV2, error) {
 
 	return &deviceV2{
 		path:  path,
-		f:     f,
+		hdrF:  hdrF,
+		dataF: dataF,
 		hdr:   &hdr,
 		meta:  &meta,
 		flags: meta.Config.Flags,
@@ -107,7 +109,13 @@ func initV2Device(path string, f *os.File) (*deviceV2, error) {
 }
 
 func (d *deviceV2) Close() error {
-	return d.f.Close()
+	err := d.hdrF.Close()
+	if d.dataF != d.hdrF {
+		if err2 := d.dataF.Close(); err == nil {
+			err = err2
+		}
+	}
+	return err
 }
 
 func (d *deviceV2) Path() string {
@@ -264,7 +272,7 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 
 	var storageSize uint64
 	if storageSegment.Size == "dynamic" {
-		storageSize, err = fileSize(d.f)
+		storageSize, err = fileSize(d.dataF)
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +360,7 @@ func (d *deviceV2) decryptLuks2VolumeKey(keyslotIdx int, keyslot keyslot, afKey 
 		return nil, fmt.Errorf("keyslot[%v] offset %v is not aligned to sector size %v", keyslotIdx, keyslotOffset, storageSectorSize)
 	}
 
-	if _, err := d.f.ReadAt(keyData, keyslotOffset); err != nil {
+	if _, err := d.hdrF.ReadAt(keyData, keyslotOffset); err != nil {
 		return nil, err
 	}
 

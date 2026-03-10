@@ -89,12 +89,59 @@ func Open(path string) (Device, error) {
 	version := int(header[6])<<8 + int(header[7])
 	switch version {
 	case 1:
-		return initV1Device(path, f)
+		return initV1Device(path, f, f)
 	case 2:
-		return initV2Device(path, f)
+		return initV2Device(path, f, f)
 	default:
 		return nil, fmt.Errorf("invalid LUKS version %v", version)
 	}
+}
+
+// OpenWithHeader opens a LUKS device that uses a detached header.
+// The LUKS metadata and keyslot material are read from headerPath,
+// while the encrypted data resides on devicePath.
+func OpenWithHeader(devicePath, headerPath string) (Device, error) {
+	hdrF, err := os.Open(headerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	header := make([]byte, 8)
+	if _, err := hdrF.ReadAt(header, 0); err != nil {
+		hdrF.Close()
+		return nil, err
+	}
+
+	if !bytes.Equal(header[0:6], []byte("LUKS\xba\xbe")) {
+		hdrF.Close()
+		return nil, fmt.Errorf("invalid LUKS header")
+	}
+
+	version := int(header[6])<<8 + int(header[7])
+
+	dataF, err := os.Open(devicePath)
+	if err != nil {
+		hdrF.Close()
+		return nil, err
+	}
+
+	var dev Device
+	defer func() {
+		if dev == nil {
+			hdrF.Close()
+			dataF.Close()
+		}
+	}()
+
+	switch version {
+	case 1:
+		dev, err = initV1Device(devicePath, hdrF, dataF)
+	case 2:
+		dev, err = initV2Device(devicePath, hdrF, dataF)
+	default:
+		err = fmt.Errorf("invalid LUKS version %v", version)
+	}
+	return dev, err
 }
 
 // Lock closes device mapper partition with the given name

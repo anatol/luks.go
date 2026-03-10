@@ -45,7 +45,7 @@ func runLuks2Test(t *testing.T, keySlot int, cryptsetupArgs ...string) {
 	defer disk.Close()
 	defer os.Remove(disk.Name())
 
-	d, err := initV2Device(disk.Name(), disk)
+	d, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())
@@ -108,6 +108,39 @@ func TestLuks2WithIntegrity(t *testing.T) {
 	runLuks2Test(t, 0, "--cipher", "aes-xts-plain64", "--integrity", "hmac-sha256", "--integrity-no-wipe", "--sector-size", "4096")
 }
 
+func TestLuks2DetachedHeader(t *testing.T) {
+	t.Parallel()
+
+	password := "foobar"
+
+	data, err := os.CreateTemp("", "luksv2.go.data")
+	require.NoError(t, err)
+	defer os.Remove(data.Name())
+	defer data.Close()
+	require.NoError(t, data.Truncate(2*1024*1024))
+
+	hdr, err := os.CreateTemp("", "luksv2.go.hdr")
+	require.NoError(t, err)
+	defer os.Remove(hdr.Name())
+	defer hdr.Close()
+	require.NoError(t, hdr.Truncate(16*1024*1024))
+
+	cmd := exec.Command("cryptsetup", "luksFormat", "--type", "luks2", "--iter-time", "5", "-q", "--header", hdr.Name(), data.Name())
+	cmd.Stdin = strings.NewReader(password)
+	if testing.Verbose() {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	require.NoError(t, cmd.Run())
+
+	d, err := OpenWithHeader(data.Name(), hdr.Name())
+	require.NoError(t, err)
+	defer d.Close()
+
+	_, err = d.UnsealVolume(0, []byte(password))
+	require.NoError(t, err)
+}
+
 func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	t.Parallel()
 
@@ -127,7 +160,7 @@ func TestLuks2UnlockMultipleKeySlots(t *testing.T) {
 	}
 	require.NoError(t, addKeyCmd.Run())
 
-	d, err := initV2Device(disk.Name(), disk)
+	d, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	_, err = d.UnsealVolume(0, []byte(password))
@@ -156,7 +189,7 @@ func TestLuks2UnlockWithToken(t *testing.T) {
 	}
 	require.NoError(t, addTokenCmd.Run())
 
-	d, err := initV2Device(disk.Name(), disk)
+	d, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	slots := d.Slots()
@@ -199,7 +232,7 @@ func TestLuks2PreferedPriority(t *testing.T) {
 	}
 	require.NoError(t, configCmd.Run())
 
-	d, err := initV2Device(disk.Name(), disk)
+	d, err := initV2Device(disk.Name(), disk, disk)
 	require.NoError(t, err)
 
 	uuid, err := blkidUUID(disk.Name())

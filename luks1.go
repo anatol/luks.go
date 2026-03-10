@@ -43,26 +43,33 @@ const luksV1SlotEnabled = 0xAC71F3
 
 type deviceV1 struct {
 	path  string
-	f     *os.File
+	hdrF  *os.File // header file: source of keyslot material
+	dataF *os.File // data device: used for storage size; equals hdrF when header is embedded
 	hdr   *headerV1
 	flags []string
 }
 
-func initV1Device(path string, f *os.File) (*deviceV1, error) {
+func initV1Device(path string, hdrF, dataF *os.File) (*deviceV1, error) {
 	var hdr headerV1
 
-	if _, err := f.Seek(0, 0); err != nil {
+	if _, err := hdrF.Seek(0, 0); err != nil {
 		return nil, err
 	}
-	if err := binary.Read(f, binary.BigEndian, &hdr); err != nil {
+	if err := binary.Read(hdrF, binary.BigEndian, &hdr); err != nil {
 		return nil, err
 	}
 
-	return &deviceV1{path: path, f: f, hdr: &hdr}, nil
+	return &deviceV1{path: path, hdrF: hdrF, dataF: dataF, hdr: &hdr}, nil
 }
 
 func (d *deviceV1) Close() error {
-	return d.f.Close()
+	err := d.hdrF.Close()
+	if d.dataF != d.hdrF {
+		if err2 := d.dataF.Close(); err == nil {
+			err = err2
+		}
+	}
+	return err
 }
 
 func (d *deviceV1) Path() string {
@@ -164,7 +171,7 @@ func (d *deviceV1) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 
 	storageOffset := uint64(d.hdr.PayloadOffset) * storageSectorSize
 
-	storageSize, err := fileSize(d.f)
+	storageSize, err := fileSize(d.dataF)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +205,7 @@ func (d *deviceV1) decryptLuks1VolumeKey(keyslotIdx int, slot keySlot, afKey []b
 	keyData := make([]byte, keyslotSize)
 	defer clearSlice(keyData)
 
-	if _, err := d.f.ReadAt(keyData, int64(slot.KeyMaterialOffset)*storageSectorSize); err != nil {
+	if _, err := d.hdrF.ReadAt(keyData, int64(slot.KeyMaterialOffset)*storageSectorSize); err != nil {
 		return nil, err
 	}
 
@@ -273,7 +280,7 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 	}
 	holeOffset = roundUp(holeOffset, 4096)
 
-	if _, err := d.f.ReadAt(data, int64(holeOffset)); err != nil {
+	if _, err := d.hdrF.ReadAt(data, int64(holeOffset)); err != nil {
 		return nil, err
 	}
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &hdr); err != nil {
@@ -298,7 +305,7 @@ func (d *deviceV1) Tokens() ([]Token, error) {
 	for i, s := range hdr.Slots {
 		if !bytes.Equal(s.UUID[:], luksMetaNullUUID) {
 			payload := make([]byte, s.Length)
-			if _, err := d.f.ReadAt(payload, int64(holeOffset)+int64(s.Offset)); err != nil {
+			if _, err := d.hdrF.ReadAt(payload, int64(holeOffset)+int64(s.Offset)); err != nil {
 				return nil, err
 			}
 			tokenChecksum := crc32.New(crc32.MakeTable(crc32.Castagnoli))
