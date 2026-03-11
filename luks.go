@@ -67,6 +67,28 @@ type Token struct {
 	Payload []byte
 }
 
+// openFromFiles detects the LUKS version from hdrF, verifies the magic bytes,
+// and dispatches to the appropriate init function.
+func openFromFiles(devicePath string, hdrF, dataF *os.File) (Device, error) {
+	// LUKS magic and version are stored in the first 8 bytes of the LUKS header
+	header := make([]byte, 8)
+	if _, err := hdrF.ReadAt(header, 0); err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(header[0:6], []byte("LUKS\xba\xbe")) {
+		return nil, fmt.Errorf("invalid LUKS header")
+	}
+	version := int(header[6])<<8 + int(header[7])
+	switch version {
+	case 1:
+		return initV1Device(devicePath, hdrF, dataF)
+	case 2:
+		return initV2Device(devicePath, hdrF, dataF)
+	default:
+		return nil, fmt.Errorf("invalid LUKS version %v", version)
+	}
+}
+
 // Open reads LUKS headers from the given partition and returns LUKS device object.
 // This function internally handles LUKS v1 and v2 partitions metadata.
 func Open(path string) (Device, error) {
@@ -74,27 +96,11 @@ func Open(path string) (Device, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// LUKS Magic and version are stored in the first 8 bytes of the LUKS header
-	header := make([]byte, 8)
-	if _, err := f.ReadAt(header[:], 0); err != nil {
-		return nil, err
+	dev, err := openFromFiles(path, f, f)
+	if err != nil {
+		f.Close()
 	}
-
-	// verify header magic
-	if !bytes.Equal(header[0:6], []byte("LUKS\xba\xbe")) {
-		return nil, fmt.Errorf("invalid LUKS header")
-	}
-
-	version := int(header[6])<<8 + int(header[7])
-	switch version {
-	case 1:
-		return initV1Device(path, f, f)
-	case 2:
-		return initV2Device(path, f, f)
-	default:
-		return nil, fmt.Errorf("invalid LUKS version %v", version)
-	}
+	return dev, err
 }
 
 // OpenWithHeader opens a LUKS device that uses a detached header.
@@ -105,41 +111,15 @@ func OpenWithHeader(devicePath, headerPath string) (Device, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	header := make([]byte, 8)
-	if _, err := hdrF.ReadAt(header, 0); err != nil {
-		hdrF.Close()
-		return nil, err
-	}
-
-	if !bytes.Equal(header[0:6], []byte("LUKS\xba\xbe")) {
-		hdrF.Close()
-		return nil, fmt.Errorf("invalid LUKS header")
-	}
-
-	version := int(header[6])<<8 + int(header[7])
-
 	dataF, err := os.Open(devicePath)
 	if err != nil {
 		hdrF.Close()
 		return nil, err
 	}
-
-	var dev Device
-	defer func() {
-		if dev == nil {
-			hdrF.Close()
-			dataF.Close()
-		}
-	}()
-
-	switch version {
-	case 1:
-		dev, err = initV1Device(devicePath, hdrF, dataF)
-	case 2:
-		dev, err = initV2Device(devicePath, hdrF, dataF)
-	default:
-		err = fmt.Errorf("invalid LUKS version %v", version)
+	dev, err := openFromFiles(devicePath, hdrF, dataF)
+	if err != nil {
+		hdrF.Close()
+		dataF.Close()
 	}
 	return dev, err
 }
