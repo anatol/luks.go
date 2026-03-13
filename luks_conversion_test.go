@@ -13,7 +13,7 @@ func prepareLuksDisk(t *testing.T, password string, typ string, extraArgs ...str
 	t.Helper()
 	disk, err := os.CreateTemp("", typ+".go.disk")
 	require.NoError(t, err)
-	require.NoError(t, disk.Truncate(2*1024*1024))
+	require.NoError(t, disk.Truncate(16*1024*1024))
 
 	args := []string{"luksFormat", "--type", typ, "-q", disk.Name()}
 	args = append(args, extraArgs...)

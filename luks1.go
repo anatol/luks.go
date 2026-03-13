@@ -343,3 +343,42 @@ func luksMetaTokenType(uuid []byte) string {
 func deriveLuks1AfKey(passphrase []byte, slot keySlot, keySize int, h func() hash.Hash) []byte {
 	return pbkdf2.Key(passphrase, slot.Salt[:], int(slot.Iterations), keySize, h)
 }
+
+// --- write operations (implemented in luks1_write.go) ---
+
+func (d *deviceV1) AddKey(existingPassphrase, newPassphrase []byte) (int, error) {
+	return d.addKeyToSlot(-1, existingPassphrase, newPassphrase)
+}
+
+func (d *deviceV1) AddKeyToSlot(slot int, existingPassphrase, newPassphrase []byte) error {
+	_, err := d.addKeyToSlot(slot, existingPassphrase, newPassphrase)
+	return err
+}
+
+func (d *deviceV1) KillSlot(slot int, passphrase []byte) error {
+	return d.killSlotV1(slot, passphrase)
+}
+
+func (d *deviceV1) RemoveKey(passphrase []byte) error {
+	return d.removeKeyV1(passphrase)
+}
+
+func (d *deviceV1) ChangeKey(existingPassphrase, newPassphrase []byte) error {
+	return d.changeKeyV1(existingPassphrase, newPassphrase)
+}
+
+func (d *deviceV1) HeaderBackup(path string) error {
+	return d.headerBackupV1(path)
+}
+
+func (d *deviceV1) HeaderRestore(path string) error {
+	return d.headerRestoreV1(path)
+}
+
+func (d *deviceV1) AddToken(_ Token) (int, error) {
+	return 0, fmt.Errorf("AddToken: %w", ErrNotSupported)
+}
+
+func (d *deviceV1) RemoveToken(_ int) error {
+	return fmt.Errorf("RemoveToken: %w", ErrNotSupported)
+}

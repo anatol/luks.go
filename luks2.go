@@ -432,12 +432,12 @@ func deriveLuks2AfKey(kdf kdf, keyslotIdx int, passphrase []byte, keyLength uint
 
 func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) *digest {
 	for _, dig := range d.meta.Digests {
-		for _, k := range dig.Keyslots {
-			k, e := k.Int64()
-			if e != nil {
+		for _, kStr := range dig.Keyslots {
+			k, err := strconv.Atoi(kStr)
+			if err != nil {
 				continue
 			}
-			if int(k) == keyslotIdx {
+			if k == keyslotIdx {
 				return &dig
 			}
 		}
@@ -445,16 +445,55 @@ func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) *digest {
 	return nil
 }
 
+// --- write operations (implemented in luks2_write.go) ---
+
+func (d *deviceV2) AddKey(existingPassphrase, newPassphrase []byte) (int, error) {
+	return d.addKeyToSlotV2(-1, existingPassphrase, newPassphrase)
+}
+
+func (d *deviceV2) AddKeyToSlot(slot int, existingPassphrase, newPassphrase []byte) error {
+	_, err := d.addKeyToSlotV2(slot, existingPassphrase, newPassphrase)
+	return err
+}
+
+func (d *deviceV2) KillSlot(slot int, passphrase []byte) error {
+	return d.killSlotV2(slot, passphrase)
+}
+
+func (d *deviceV2) RemoveKey(passphrase []byte) error {
+	return d.removeKeyV2(passphrase)
+}
+
+func (d *deviceV2) ChangeKey(existingPassphrase, newPassphrase []byte) error {
+	return d.changeKeyV2(existingPassphrase, newPassphrase)
+}
+
+func (d *deviceV2) HeaderBackup(path string) error {
+	return d.headerBackupV2(path)
+}
+
+func (d *deviceV2) HeaderRestore(path string) error {
+	return d.headerRestoreV2(path)
+}
+
+func (d *deviceV2) AddToken(t Token) (int, error) {
+	return d.addTokenV2(t)
+}
+
+func (d *deviceV2) RemoveToken(id int) error {
+	return d.removeTokenV2(id)
+}
+
 // findCryptSegment returns the first segment of type "crypt" referenced by the
 // given digest. This handles the multi-segment case (e.g. integrity layouts)
 // where a digest may cover both a "crypt" and a "linear" segment.
 func (d *deviceV2) findCryptSegment(dig *digest) (*segment, error) {
-	for _, segNum := range dig.Segments {
-		segID, err := segNum.Int64()
+	for _, segStr := range dig.Segments {
+		segID, err := strconv.Atoi(segStr)
 		if err != nil {
 			continue
 		}
-		seg, ok := d.meta.Segments[int(segID)]
+		seg, ok := d.meta.Segments[segID]
 		if !ok {
 			continue
 		}
