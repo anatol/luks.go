@@ -1,6 +1,11 @@
 package luks
 
 import (
+	"crypto"
+	"crypto/hmac"
+	_ "crypto/sha1"   // register crypto.SHA1 for HMAC
+	_ "crypto/sha256" // register crypto.SHA256
+	_ "crypto/sha512" // register crypto.SHA384 and crypto.SHA512
 	"fmt"
 	"strings"
 
@@ -28,6 +33,36 @@ var flagsKernelNames = map[string]string{
 	FlagSubmitFromCryptCPUs: devmapper.CryptFlagSubmitFromCryptCPUs,
 	FlagNoReadWorkqueue:     devmapper.CryptFlagNoReadWorkqueue,
 	FlagNoWriteWorkqueue:    devmapper.CryptFlagNoWriteWorkqueue,
+}
+
+// hmacAllowedHashes restricts HMAC to standard-library hash implementations.
+// The hash is selected by a crypto.Hash identifier rather than a caller-supplied
+// constructor, so callers cannot inject an implementation that observes the
+// volume key during the HMAC computation.
+var hmacAllowedHashes = map[crypto.Hash]bool{
+	crypto.SHA1:   true,
+	crypto.SHA256: true,
+	crypto.SHA384: true,
+	crypto.SHA512: true,
+}
+
+// HMAC returns HMAC(volume key, message) using the given hash. The hash is
+// identified by a crypto.Hash value and must be one of the supported algorithms;
+// the volume key is only ever fed to a trusted standard-library implementation.
+// It never leaves the package — callers receive only the resulting digest, which
+// carries no key material. This lets a consumer bind a value to the unlocked
+// volume (e.g. measure it into a TPM PCR) without the master key crossing the
+// package boundary.
+func (v *Volume) HMAC(h crypto.Hash, message []byte) ([]byte, error) {
+	if !hmacAllowedHashes[h] {
+		return nil, fmt.Errorf("luks: HMAC: unsupported hash %s", h)
+	}
+	if !h.Available() {
+		return nil, fmt.Errorf("luks: HMAC: hash %s is not available", h)
+	}
+	mac := hmac.New(h.New, v.key)
+	mac.Write(message)
+	return mac.Sum(nil), nil
 }
 
 // SetupMapper creates a device mapper for the given LUKS volume
