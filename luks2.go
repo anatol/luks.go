@@ -215,7 +215,7 @@ func (d *deviceV2) Unlock(keyslot int, passphrase []byte, dmName string) error {
 	if err != nil {
 		return err
 	}
-	defer clearSlice(volume.key)
+	defer volume.Clear()
 
 	return volume.SetupMapper(dmName)
 }
@@ -229,10 +229,32 @@ func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
 		} else if err != nil {
 			return err
 		}
+		defer volume.Clear()
 
 		return volume.SetupMapper(dmName)
 	}
 	return ErrPassphraseDoesNotMatch
+}
+
+// supportedRequirements lists the LUKS2 mandatory requirements this library
+// implements. A device carrying any other mandatory requirement must not be
+// activated: the unknown feature may change how the data area is mapped
+// (e.g. online reencryption), so proceeding could corrupt data.
+var supportedRequirements = map[string]bool{
+	"opal": true, // TCG OPAL hardware encryption (cryptsetup >= 2.7)
+}
+
+// checkRequirements refuses to proceed when the header carries a mandatory
+// requirement this library does not implement. Enforced at unseal time rather
+// than open time so that read-only introspection (Slots, Tokens, UUID) keeps
+// working on such devices, mirroring cryptsetup's luksDump behavior.
+func (d *deviceV2) checkRequirements() error {
+	for _, r := range d.meta.Config.Requirements {
+		if !supportedRequirements[r] {
+			return fmt.Errorf("LUKS2 device has unsupported mandatory requirement %q", r)
+		}
+	}
+	return nil
 }
 
 // UnsealVolume implements Device.UnsealVolume for LUKS v2 devices.
@@ -240,6 +262,10 @@ func (d *deviceV2) UnlockAny(passphrase []byte, dmName string) error {
 // decrypts the keyslot area, recovers the volume key, and verifies it against
 // the digest entry associated with this keyslot.
 func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, error) {
+	if err := d.checkRequirements(); err != nil {
+		return nil, err
+	}
+
 	keyslots := d.meta.Keyslots
 
 	keyslot, ok := keyslots[keyslotIdx]
@@ -279,7 +305,7 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 	}
 	clearSlice(generatedDigest)
 
-	storageSegment, err := d.findCryptSegment(digest)
+	storageSegment, err := d.findStorageSegment(digest)
 	if err != nil {
 		return nil, err
 	}
@@ -313,9 +339,13 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 		storageSize = uint64(size)
 	}
 
-	ivTweak, err := storageSegment.IvTweak.Int64()
-	if err != nil {
-		return nil, err
+	// pure "hw-opal" segments have no iv_tweak field
+	var ivTweak int64
+	if storageSegment.Type != "hw-opal" {
+		ivTweak, err = storageSegment.IvTweak.Int64()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	v := &Volume{
@@ -329,7 +359,26 @@ func (d *deviceV2) UnsealVolume(keyslotIdx int, passphrase []byte) (*Volume, err
 		StorageEncryption: storageSegment.Encryption,
 		StorageIvTweak:    uint64(ivTweak),
 		StorageSectorSize: uint64(storageSegment.SectorSize),
+		segmentType:       storageSegment.Type,
 	}
+
+	if storageSegment.Type == "hw-opal" || storageSegment.Type == "hw-opal-crypt" {
+		opal, err := parseOpalSegment(storageSegment, len(finalKey))
+		if err != nil {
+			return nil, err
+		}
+		// the dm UUID type cryptsetup uses for OPAL-backed devices; the
+		// only OPAL marker available once a device is active
+		v.LuksType = "LUKS2-OPAL"
+		v.opalKeySize = opal.keySize
+		v.opalSegmentNumber = opal.segmentNumber
+		v.opalSegmentSize = opal.segmentSize
+		if storageSegment.Type == "hw-opal" {
+			// cryptsetup's default for segments without a sector_size field
+			v.StorageSectorSize = 512
+		}
+	}
+
 	return v, nil
 }
 
@@ -471,10 +520,19 @@ func (d *deviceV2) findDigestForKeyslot(keyslotIdx int) *digest {
 	return nil
 }
 
-// findCryptSegment returns the first segment of type "crypt" referenced by the
-// given digest. This handles the multi-segment case (e.g. integrity layouts)
-// where a digest may cover both a "crypt" and a "linear" segment.
-func (d *deviceV2) findCryptSegment(dig *digest) (*segment, error) {
+// storageSegmentTypes are the segment types this library can activate:
+// software dm-crypt ("crypt") and the TCG OPAL hardware-encryption types
+// introduced by cryptsetup 2.7.
+var storageSegmentTypes = map[string]bool{
+	"crypt":         true,
+	"hw-opal":       true,
+	"hw-opal-crypt": true,
+}
+
+// findStorageSegment returns the first activatable storage segment referenced
+// by the given digest. This handles the multi-segment case (e.g. integrity
+// layouts) where a digest may cover both a storage and a "linear" segment.
+func (d *deviceV2) findStorageSegment(dig *digest) (*segment, error) {
 	for _, segNum := range dig.Segments {
 		segID, err := segNum.Int64()
 		if err != nil {
@@ -484,9 +542,9 @@ func (d *deviceV2) findCryptSegment(dig *digest) (*segment, error) {
 		if !ok {
 			continue
 		}
-		if seg.Type == "crypt" {
+		if storageSegmentTypes[seg.Type] {
 			return &seg, nil
 		}
 	}
-	return nil, fmt.Errorf("no crypt segment found in digest (segments: %v)", dig.Segments)
+	return nil, fmt.Errorf("no storage segment found in digest (segments: %v)", dig.Segments)
 }

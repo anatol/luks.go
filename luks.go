@@ -127,7 +127,12 @@ func OpenWithHeader(devicePath, headerPath string) (Device, error) {
 	return dev, err
 }
 
-// Lock closes device mapper partition with the given name
+// Lock closes the device mapper partition with the given name.
+//
+// For TCG OPAL volumes this removes only the dm device; the drive's locking
+// range stays unlocked until the next power-off (resume from S3 re-applies
+// the state recorded at unlock time). Re-locking here would need the backing
+// device and the range key, which a bare dm name does not provide.
 func Lock(name string) error {
 	return devmapper.Remove(name)
 }

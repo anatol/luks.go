@@ -6,11 +6,11 @@ import (
 )
 
 type keyslot struct {
-	Type     string       `json:"type"`
-	KeySize  uint         `json:"key_size"`
-	Af       antiForensic `json:"af"`
-	Area     area         `json:"area"`
-	Kdf      kdf          `json:"kdf"`
+	Type    string       `json:"type"`
+	KeySize uint         `json:"key_size"`
+	Af      antiForensic `json:"af"`
+	Area    area         `json:"area"`
+	Kdf     kdf          `json:"kdf"`
 	// Priority is a pointer to distinguish three states:
 	// nil = normal priority (default), 0 = ignore (skip slot), 1 = normal, 2 = high (prefer)
 	Priority *int `json:"priority"`
@@ -52,6 +52,13 @@ type segment struct {
 	Encryption string      `json:"encryption"`
 	SectorSize uint        `json:"sector_size"`
 	Flags      []string    `json:"flags"`
+
+	// OPAL fields, present only for segment types "hw-opal" and
+	// "hw-opal-crypt" (cryptsetup >= 2.7). A pure "hw-opal" segment carries
+	// none of the encryption/sector_size/iv_tweak fields above.
+	OpalSegmentNumber uint   `json:"opal_segment_number"` // OPAL locking-range index
+	OpalKeySize       uint   `json:"opal_key_size"`       // bytes; prefix of the keyslot key
+	OpalSegmentSize   string `json:"opal_segment_size"`   // decimal byte count of the locking range
 }
 
 type digest struct {

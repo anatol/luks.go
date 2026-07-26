@@ -24,6 +24,15 @@ Requires Linux (uses device-mapper via `/dev/mapper`).
 - Token metadata (clevis, systemd-fido2, etc.)
 - LUKS v2 keyslot priorities
 - Multi-segment LUKS2 layouts (e.g. integrity)
+- TCG OPAL self-encrypting drives (cryptsetup `--hw-opal` and `--hw-opal-only`
+  segments): the locking range is unlocked through the kernel SED interface
+  (`CONFIG_BLK_SED_OPAL`) and mapped with dm-linear or dm-crypt; active
+  devices carry the same `CRYPT-LUKS2-OPAL-...` dm UUID as cryptsetup
+
+Note: LUKS2 mandatory requirements are enforced at unseal time. Devices whose
+header carries a requirement this library does not implement (e.g.
+`online-reencrypt-v2` while a re-encryption is in progress) are refused,
+matching cryptsetup's behavior.
 
 ## Usage
 
