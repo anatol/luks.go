@@ -1,0 +1,56 @@
+{
+  "keyslots": {
+    "0": {
+      "type": "luks2",
+      "key_size": 32,
+      "af": {
+        "type": "luks1",
+        "stripes": 4000,
+        "hash": "sha256"
+      },
+      "area": {
+        "type": "raw",
+        "encryption": "aes-xts-plain64",
+        "key_size": 32,
+        "offset": "32768",
+        "size": "131072"
+      },
+      "kdf": {
+        "type": "argon2id",
+        "time": 4,
+        "memory": 235980,
+        "cpus": 2,
+        "salt": "z6vz4xK7cjan92rDA5JF8O6Jk2HouV0O8DMB6GlztVk="
+      }
+    }
+  },
+  "tokens": {},
+  "segments": {
+    "0": {
+      "type": "hw-opal",
+      "offset": "16777216",
+      "size": "1073741824",
+      "opal_segment_number": 3,
+      "opal_key_size": 32,
+      "opal_segment_size": "1073741824"
+    }
+  },
+  "digests": {
+    "0": {
+      "type": "pbkdf2",
+      "keyslots": ["0"],
+      "segments": ["0"],
+      "hash": "sha256",
+      "iterations": 110890,
+      "salt": "G8gqtKhS96IbogHyJLO+t9kmjLkx+DM3HHJqQtgc2Dk=",
+      "digest": "C9JWko5m+oYmjg6R0t/98cGGzLr/4UaG3hImSJMivfc="
+    }
+  },
+  "config": {
+    "json_size": "12288",
+    "keyslots_size": "4161536",
+    "requirements": {
+      "mandatory": ["opal"]
+    }
+  }
+}

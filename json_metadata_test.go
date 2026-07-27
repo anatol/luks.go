@@ -99,6 +99,64 @@ func TestConfigFlagsAbsent(t *testing.T) {
 	require.Nil(t, meta.Config.Flags)
 }
 
+// TestSegmentHwOpal verifies parsing of a pure "hw-opal" segment (cryptsetup
+// --hw-opal-only). Such segments carry the OPAL fields but none of the
+// software-encryption fields: encryption, sector_size and iv_tweak are absent.
+func TestSegmentHwOpal(t *testing.T) {
+	data, err := os.ReadFile("testdata/metadata/hw_opal.json")
+	require.NoError(t, err)
+
+	var meta metadata
+	require.NoError(t, json.Unmarshal(data, &meta))
+
+	seg := meta.Segments[0]
+	require.Equal(t, "hw-opal", seg.Type)
+	require.Equal(t, uint(3), seg.OpalSegmentNumber)
+	require.Equal(t, uint(32), seg.OpalKeySize)
+	require.Equal(t, "1073741824", seg.OpalSegmentSize)
+	require.Equal(t, "16777216", seg.Offset.String())
+	require.Equal(t, "1073741824", seg.Size)
+	// no software encryption on a pure hw-opal segment
+	require.Equal(t, "", seg.Encryption)
+	require.Equal(t, uint(0), seg.SectorSize)
+	require.Equal(t, "", seg.IvTweak.String())
+	require.ElementsMatch(t, []string{"opal"}, []string(meta.Config.Requirements))
+}
+
+// TestSegmentHwOpalCrypt verifies parsing of a "hw-opal-crypt" segment
+// (cryptsetup --hw-opal): OPAL fields plus the usual software crypt fields.
+func TestSegmentHwOpalCrypt(t *testing.T) {
+	data, err := os.ReadFile("testdata/metadata/hw_opal_crypt.json")
+	require.NoError(t, err)
+
+	var meta metadata
+	require.NoError(t, json.Unmarshal(data, &meta))
+
+	seg := meta.Segments[0]
+	require.Equal(t, "hw-opal-crypt", seg.Type)
+	require.Equal(t, uint(3), seg.OpalSegmentNumber)
+	require.Equal(t, uint(32), seg.OpalKeySize)
+	require.Equal(t, "1073741824", seg.OpalSegmentSize)
+	require.Equal(t, "aes-xts-plain64", seg.Encryption)
+	require.Equal(t, uint(512), seg.SectorSize)
+	require.Equal(t, uint(96), meta.Keyslots[0].KeySize)
+}
+
+// TestSegmentOpalFieldsAbsent verifies that ordinary crypt segments parse with
+// zero-valued OPAL fields.
+func TestSegmentOpalFieldsAbsent(t *testing.T) {
+	data, err := os.ReadFile("testdata/metadata/1.json")
+	require.NoError(t, err)
+
+	var meta metadata
+	require.NoError(t, json.Unmarshal(data, &meta))
+
+	seg := meta.Segments[0]
+	require.Equal(t, uint(0), seg.OpalSegmentNumber)
+	require.Equal(t, uint(0), seg.OpalKeySize)
+	require.Equal(t, "", seg.OpalSegmentSize)
+}
+
 // TestRequirementsRoundtrip verifies that inline JSON with requirements in both
 // formats is handled correctly.
 func TestRequirementsRoundtrip(t *testing.T) {

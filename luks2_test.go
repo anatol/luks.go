@@ -1,6 +1,7 @@
 package luks
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -234,4 +235,62 @@ func TestLuks2PreferedPriority(t *testing.T) {
 	require.NoError(t, err)
 
 	require.ElementsMatch(t, []int{0}, d.Slots())
+}
+
+// TestCheckRequirements verifies that mandatory LUKS2 requirements gate
+// unsealing: supported requirements pass, unknown ones produce an error.
+func TestCheckRequirements(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		requirements []string
+		wantErr      string
+	}{
+		{name: "absent", requirements: nil},
+		{name: "opal", requirements: []string{"opal"}},
+		// a -vN suffix means incompatible new semantics; must not be pre-approved
+		{name: "unknown opal version", requirements: []string{"opal-v2"}, wantErr: `unsupported mandatory requirement "opal-v2"`},
+		{name: "unknown", requirements: []string{"online-reencrypt-v2"}, wantErr: `unsupported mandatory requirement "online-reencrypt-v2"`},
+		{name: "mixed known and unknown", requirements: []string{"opal", "inline-hw-tags"}, wantErr: `unsupported mandatory requirement "inline-hw-tags"`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &deviceV2{meta: &metadata{Config: config{Requirements: tc.requirements}}}
+			err := d.checkRequirements()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestFindStorageSegment verifies segment selection across the activatable
+// segment types and the skip-over-linear behavior.
+func TestFindStorageSegment(t *testing.T) {
+	t.Parallel()
+
+	mkDev := func(segType string) *deviceV2 {
+		return &deviceV2{meta: &metadata{
+			Segments: map[int]segment{
+				0: {Type: "linear"},
+				1: {Type: segType},
+			},
+		}}
+	}
+	dig := &digest{Segments: []json.Number{"0", "1"}}
+
+	for _, segType := range []string{"crypt", "hw-opal", "hw-opal-crypt"} {
+		d := mkDev(segType)
+		seg, err := d.findStorageSegment(dig)
+		require.NoError(t, err, segType)
+		require.Equal(t, segType, seg.Type)
+	}
+
+	d := mkDev("linear")
+	_, err := d.findStorageSegment(dig)
+	require.ErrorContains(t, err, "no storage segment found")
 }

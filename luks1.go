@@ -129,7 +129,7 @@ func (d *deviceV1) Unlock(keyslot int, passphrase []byte, dmName string) error {
 	if err != nil {
 		return err
 	}
-	defer clearSlice(volume.key)
+	defer volume.Clear()
 
 	return volume.SetupMapper(dmName)
 }
@@ -147,6 +147,7 @@ func (d *deviceV1) UnlockAny(passphrase []byte, dmName string) error {
 		} else if err != nil {
 			return err
 		}
+		defer volume.Clear()
 
 		return volume.SetupMapper(dmName)
 	}
